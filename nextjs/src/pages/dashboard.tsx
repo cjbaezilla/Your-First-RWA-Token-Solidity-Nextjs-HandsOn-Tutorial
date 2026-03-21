@@ -193,6 +193,12 @@ const Dashboard: NextPage = () => {
                   </span>
                   <span className={styles.headerStatLabel}>Frozen</span>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', padding: '0.75rem 1rem', gap: '0.25rem', marginLeft: '1rem' }}>
+                  <span className={`${styles.statusBadge} ${isAllowed ? styles.statusBadgeAllowed : styles.statusBadgeRestricted}`}>
+                    {isAllowed ? '✓ Allowed' : '⛔ Restricted'}
+                  </span>
+                  <span className={styles.headerStatLabel}>Status</span>
+                </div>
               </div>
         </div>
 
