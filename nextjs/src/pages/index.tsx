@@ -30,6 +30,11 @@ const Home: NextPage = () => {
         </p>
 
         <div className={styles.grid}>
+          <a className={styles.card} href="/dashboard" style={{ border: '2px solid #6366f1' }}>
+            <h2>RWA Dashboard &rarr;</h2>
+            <p>Go to the token management dashboard to interact with the contract.</p>
+          </a>
+
           <a className={styles.card} href="https://rainbowkit.com">
             <h2>RainbowKit Documentation &rarr;</h2>
             <p>Learn how to customize your wallet connection flow.</p>
