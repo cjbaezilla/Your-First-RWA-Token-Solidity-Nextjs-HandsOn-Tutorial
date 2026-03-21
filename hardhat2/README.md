@@ -45,6 +45,8 @@ Six distinct roles with specific permissions:
 - Node.js (v18+)
 - npm or yarn
 - Git
+- **Sepolia Testnet ETH** - A funded wallet on Sepolia testnet for contract deployment
+- **Etherscan API Key** - Required for contract verification (get from https://sepolia.etherscan.io/apis)
 
 ## Installation
 
@@ -61,10 +63,21 @@ Six distinct roles with specific permissions:
    
    Edit `.env` with your values:
    ```env
-   SEPOLIA_RPC_URL=your_rpc_endpoint
-   PRIVATE_KEY=your_private_key
-   ETHERSCAN_API_KEY=your_etherscan_api_key
+   # Required: Your wallet private key (with 0x prefix) for contract deployment
+   PRIVATE_KEY=0xYourPrivateKeyHere
+   
+   # Required: RPC endpoint for Sepolia testnet (Infura, Alchemy, or public RPC)
+   SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+   
+   # Required: Etherscan API key for contract verification
+   # Get from: https://sepolia.etherscan.io/apis
+   ETHERSCAN_API_KEY=YourEtherscanAPIKey
    ```
+   
+   **⚠️ Important:**
+   - Your wallet must be **funded with Sepolia testnet ETH** to pay for gas fees
+   - Get test ETH from a faucet: https://sepoliafaucet.com/
+   - Never share or commit your `.env` file - it contains sensitive keys
 
 ## Configuration
 
@@ -98,14 +111,45 @@ npx hardhat node
 ```
 
 ### Deploy to Sepolia
-```bash
-npx hardhat run scripts/deploy.js --network sepolia
-```
+
+1. **Ensure your `.env` file is properly configured** with:
+   - `SEPOLIA_RPC_URL` - Your RPC endpoint (Infura, Alchemy, or public RPC)
+   - `PRIVATE_KEY` - Your wallet private key (with 0x prefix)
+   - `ETHERSCAN_API_KEY` - Your Etherscan API key
+
+2. **Fund your wallet** with Sepolia testnet ETH from a faucet:
+   - https://sepoliafaucet.com/
+   - https://www.alchemy.com/faucets/ethereum-sepolia
+   - https://infura.io/faucet/sepolia
+
+3. **Deploy the contract**:
+   ```bash
+   npx hardhat run scripts/deploy.js --network sepolia
+   ```
+
+   The deployment script will output the deployed contract address.
+
+4. **Copy the contract address** from the deployment output.
 
 ### Verify Contract on Etherscan
-```bash
-npx hardhat verify --network sepolia <contract_address> <constructor_args>
-```
+
+1. **Verify the contract** using the deployed address and constructor arguments:
+
+   ```bash
+   npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <DEFAULT_ADMIN> <PAUSER> <MINTER> <FREEZER> <LIMITER> <RECOVERY_ADMIN>
+   ```
+
+   Replace `<CONTRACT_ADDRESS>` with your deployed contract address and the role addresses with the actual addresses used in deployment.
+
+2. **Alternative method with automatic etherscan** (if configured in `hardhat.config.js`):
+
+   The verify plugin can automatically detect verification when using:
+
+   ```bash
+   npx hardhat run scripts/deploy.js --network sepolia --verify
+   ```
+
+   Note: This requires proper configuration in `hardhat.config.js`.
 
 ### Deploy with Ignition (Alternative)
 ```bash
