@@ -459,11 +459,229 @@ The pausable feature is necessary for compliance but it creates centralization r
 
 The forcedTransfer function could be abused if the recovery admin becomes malicious. This role should also be held by a multi-signature wallet or a decentralized autonomous organization.
 
-## Conclusion
+## Next.js Frontend Implementation
 
-This contract demonstrates how OpenZeppelin components combine to create a production-ready RWA token. The inheritance approach minimizes custom code and maximizes reliance on audited libraries. The role-based access control provides flexibility while maintaining security boundaries. The restrictions support regulatory compliance needs.
+Now let's examine how to interact with this token contract from a Next.js application. The frontend uses Wagmi and RainbowKit for wallet connectivity and contract interactions. The implementation consists of three key components:
 
-For someone new to blockchain, I would say this token behaves like a digital representation of a physical asset with strict rules about who can hold it and who can manage it. The blockchain ensures these rules execute exactly as written without anyone being able to override them. The administrative roles give designated humans the ability to respond to real world events while keeping those powers accountable through transparency and separation of duties.
+### Wagmi Configuration
+
+The wagmi configuration sets up blockchain connectivity using RainbowKit's default configuration:
+
+```typescript
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { sepolia } from 'wagmi/chains';
+
+export const config = getDefaultConfig({
+  appName: 'RainbowKit App',
+  projectId: 'YOUR_PROJECT_ID',
+  chains: [sepolia],
+  ssr: true,
+});
+```
+
+This configuration connects to the Sepolia testnet with wallet connection support. Replace `YOUR_PROJECT_ID` with your actual WalletConnect project ID. The `ssr: true` option enables server-side rendering support.
+
+### Custom Hook: useRwaToken
+
+The `useRwaToken` hook (located in `nextjs/src/hooks/useRwaToken.ts`) provides a comprehensive interface for all token operations. It wraps Wagmi's contract hooks and adds event monitoring and role-based access control.
+
+#### Role Constants
+
+```typescript
+export const ROLES = {
+  ADMIN: '0x0000000000000000000000000000000000000000000000000000000000000000',
+  PAUSER: '0x65d175404fa3028d689658516d25816fd5656ca895101662c19e5d6d9c49caee',
+  MINTER: '0x9f2df0da571034f45f091cd2003c23de3b02005f0373d5494191c0453d862f92',
+  FREEZER: '0xe1db091c5213600bef1832049e6f3d9ed360e2ce1c28c89d2d0b5713437c6883',
+  LIMITER: '0x272b380bf9d2d9ab04f2f099f6f34e3215904bb61480f27f00e57204481358da',
+  RECOVERY: '0x8110b930d413348003612807f7c66cb17c2f0d61efb5e5fb595f560e7ee68058',
+} as const;
+```
+
+These are the keccak256 hashes of the role names as defined in the contract.
+
+#### Read Hooks
+
+The hook exposes multiple read hooks for querying contract state:
+
+```typescript
+// Balance of any address
+const { data: balance } = useTokenBalance(userAddress);
+
+// Total token supply
+const { data: supply } = useTokenSupply();
+
+// Whether a user is allowed to transact (allowlist check)
+const { data: isAllowed } = useIsUserAllowed(userAddress);
+
+// Contract paused status
+const { data: isPaused } = usePaused();
+
+// Frozen amount for an address
+const { data: frozenAmt } = useFrozenAmount(userAddress);
+
+// Check if address has a specific role
+const { data: hasMinter } = useHasRole(ROLES.MINTER, userAddress);
+
+// Token decimals (returns 18)
+const { data: decimals } = useTokenDecimals();
+```
+
+All read hooks automatically refetch at intervals (typically every 5 seconds) to keep the UI in sync with blockchain state.
+
+#### Write Actions
+
+The hook provides action functions for all token operations:
+
+```typescript
+// Administrative actions (require roles)
+mint(to: string, amount: bigint)     // MINTER_ROLE
+freeze(user: string, amount: bigint) // FREEZER_ROLE
+allowUser(user: string)              // LIMITER_ROLE
+disallowUser(user: string)           // LIMITER_ROLE
+pause()                              // PAUSER_ROLE
+unpause()                            // PAUSER_ROLE
+forcedTransfer(from, to, amount)     // RECOVERY_ROLE
+
+// Standard token actions (available to all users)
+transfer(to: string, amount: bigint)
+burn(amount: bigint)
+burnFrom(account, amount)    // Requires prior approval
+approve(spender, amount)
+transferFrom(from, to, amount) // Requires prior approval
+```
+
+Each action returns a transaction hash through the `writeContract` function from Wagmi. The hook also tracks pending states:
+
+```typescript
+const {
+  isWritePending,    // Transaction submitted but not confirmed
+  isConfirming,      // Transaction is being confirmed on-chain
+  isConfirmed,       // Transaction confirmed
+  writeError,        // Any error from the write operation
+  hash               // Current transaction hash
+} = useRwaToken();
+```
+
+#### Event Monitoring
+
+The hook automatically monitors contract events and maintains a list of the most recent ones:
+
+```typescript
+const { events } = useRwaToken();
+
+// Each event object contains:
+// - eventName: 'Transfer', 'Mint', 'Freeze', etc.
+// - args: decoded event parameters
+// - transactionHash, blockNumber, etc.
+```
+
+This enables an activity feed that shows all token operations in real-time.
+
+### Dashboard Page
+
+The main dashboard (`nextjs/src/pages/dashboard.tsx`) provides a full-featured interface for interacting with the token. It's organized into tabs: Overview, Transfer, Supply, and Activity.
+
+#### Tab Structure
+
+```typescript
+type TabType = 'overview' | 'transfer' | 'supply' | 'activity';
+```
+
+#### Overview Tab
+
+The overview displays user balance, total supply, frozen amount, and allowlist status. It also shows which administrative roles the connected user holds:
+
+```tsx
+<div className={styles.rolesPanel}>
+  <h3>Your Roles</h3>
+  <div className={styles.rolesGrid}>
+    {Object.entries(ROLES).map(([name, hash]) => (
+      <div key={name} className={`${styles.roleBadge} ${rolesStatus[name] ? styles.roleBadgeActive : ''}`}>
+        {name}
+      </div>
+    ))}
+  </div>
+</div>
+```
+
+Based on the user's roles, administrative action cards appear: Manage Allowlist, Freeze Balance, and Recovery Transfer.
+
+#### Transfer Tab
+
+Provides three standard token operations:
+
+```tsx
+// 1. Quick Transfer - send tokens to any address
+transfer(to, parseAmount(amount));
+
+// 2. Approve Spender - grant spending allowance
+approve(spender, parseAmount(amount));
+
+// 3. Transfer From - transfer from another account (after approval)
+transferFrom(from, to, parseAmount(amount));
+```
+
+All transfer actions check `isAllowed` status and disable the interface if the user is restricted:
+
+```tsx
+disabled={!isAllowed}
+```
+
+#### Supply Tab
+
+Provides minting and burning operations. The mint button only appears if the user has MINTER_ROLE:
+
+```tsx
+{canMint && (
+  <ActionCard
+    title="Mint New Tokens"
+    onAction={() => mint(formData.mintTo, parseAmount(formData.mintAmount))}
+    ...
+  />
+)}
+```
+
+Burning is available to all token holders:
+
+```tsx
+// Burn your own tokens
+burn(parseAmount(burnAmount));
+
+// Burn from another account (requires allowance)
+burnFrom(account, parseAmount(amount));
+```
+
+#### Activity Tab
+
+Displays a real-time list of all contract events using the monitored events from the hook:
+
+```tsx
+<EventLogList events={events} />
+```
+
+### Data Flow
+
+The application uses a unified pattern for all interactions:
+
+1. **Read operations** use `useReadContract` with automatic refetching
+2. **Write operations** use `useWriteContract` wrapped in `useCallback` to prevent unnecessary re-renders
+3. **Transaction states** are tracked with `useWaitForTransactionReceipt` to show confirmation progress
+4. **Event monitoring** uses `useWatchContractEvent` with polling to maintain an up-to-date activity log
+
+This architecture provides a responsive, real-time interface for managing the RWA token with proper error handling and loading states throughout.
+
+### Using the Dashboard
+
+To use the dashboard:
+
+1. Connect your wallet using the RainbowKit connect button
+2. Ensure you have tokens on Sepolia testnet (or your configured chain)
+3. Navigate between tabs to access different features
+4. The UI automatically shows/hides admin functions based on your contract roles
+5. All transactions require wallet confirmation and show progress indicators
+
+The dashboard demonstrates how the token's advanced features (freezing, allowlist, recovery transfers) are accessible through a clean web interface while maintaining proper access control at the contract level.
 
 ERC20Freezable and ERC20Restricted are elegant solutions to real world regulatory needs. The freezing mechanism lets me immobilize specific token amounts while leaving the remainder accessible. The restriction system lets me control which accounts can participate. Both contracts integrate seamlessly with ERC20 by overriding the internal _update function that every transfer goes through.
 
