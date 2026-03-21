@@ -35,7 +35,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -302,6 +302,40 @@
   background: rgba(239, 68, 68, 0.15);
   color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sidebarStatusBadge {
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: default;
+}
+
+.sidebarStatusBadge button {
+  background: transparent;
+  border: 1px solid currentColor;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  opacity: 0.8;
+  color: inherit;
+}
+
+.sidebarStatusBadge button:hover:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.sidebarStatusBadge button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .statusDetails {

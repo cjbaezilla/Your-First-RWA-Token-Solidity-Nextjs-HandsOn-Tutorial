@@ -132,18 +132,34 @@ const Dashboard: NextPage = () => {
 
       {/* Sidebar */}
       <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
-        <div className={styles.sidebarHeader}>
-          <div className={styles.logo}>
-            <span className={styles.logoIcon}>◇</span>
-            {!sidebarCollapsed && <span className={styles.logoText}>1stRWA</span>}
-          </div>
-          <button 
-            className={styles.sidebarToggle}
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          >
-            {sidebarCollapsed ? '→' : '←'}
-          </button>
-        </div>
+         <div className={styles.sidebarHeader}>
+           <div className={styles.logo}>
+             <span className={styles.logoIcon}>◇</span>
+             {!sidebarCollapsed && <span className={styles.logoText}>1stRWA</span>}
+           </div>
+           <button 
+             className={styles.sidebarToggle}
+             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+           >
+             {sidebarCollapsed ? '→' : '←'}
+           </button>
+         </div>
+         
+          {!sidebarCollapsed && (
+            <div style={{ padding: '0 1rem' }}>
+              <div className={`${styles.statusBadge} ${styles.sidebarStatusBadge} ${isPaused ? styles.statusBadgeRestricted : styles.statusBadgeAllowed}`}>
+                <span>{isPaused ? '⏸️ Paused' : '▶️ Active'}</span>
+                {canPause && (
+                  <button
+                    onClick={() => isPaused ? unpause() : pause()}
+                    disabled={isWritePending || isConfirming}
+                  >
+                    {isPaused ? 'Resume' : 'Pause'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
         <nav className={styles.sidebarNav}>
           {sidebarNav.map(item => (
@@ -216,25 +232,16 @@ const Dashboard: NextPage = () => {
                      <div className={styles.statCardLabel}>Your Balance</div>
                    </div>
                 </div>
-                <div className={styles.statCardCompact}>
-                  <div className={styles.statCardIcon}>📈</div>
-                 <div className={styles.statCardContent}>
-                     <div className={styles.statCardValue}>
-                       {formatAmount(supply)} RWA
-                     </div>
-                     <div className={styles.statCardLabel}>Total Supply</div>
-                   </div>
-                </div>
-                <div className={`${styles.statCardCompact} ${isPaused ? styles.statCardWarning : styles.statCardSuccess}`}>
-                  <div className={styles.statCardIcon}>{isPaused ? '⏸️' : '▶️'}</div>
+                 <div className={styles.statCardCompact}>
+                   <div className={styles.statCardIcon}>📈</div>
                   <div className={styles.statCardContent}>
-                    <div className={styles.statCardValue}>
-                      {isPaused ? 'Paused' : 'Active'}
+                      <div className={styles.statCardValue}>
+                        {formatAmount(supply)} RWA
+                      </div>
+                      <div className={styles.statCardLabel}>Total Supply</div>
                     </div>
-                    <div className={styles.statCardLabel}>Contract Status</div>
-                  </div>
-                </div>
-              </div>
+                 </div>
+               </div>
 
               <div className={styles.accountStatus}>
                 <div className={styles.statusHeader}>
