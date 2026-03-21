@@ -402,6 +402,80 @@ MyFirstTokenERC20RWA
 
 ---
 
+## Events
+
+The MyFirstTokenERC20RWA contract emits events from its parent contracts to provide off-chain visibility into state changes. All events are triggered by state-changing functions and are indexed for efficient filtering.
+
+### Standard ERC20 Events
+
+#### Transfer
+- **Signature:** `event Transfer(address indexed from, address indexed to, uint256 value)`
+- **Triggered by:** `transfer()`, `transferFrom()`, `mint()`, `burn()`, `burnFrom()`, and ERC1363 `transferAndCall()`, `transferFromAndCall()`
+- **When:** Whenever tokens move between accounts
+  - Normal transfers: `from` is sender, `to` is recipient
+  - Minting: `from` is `address(0)`, `to` is minting recipient
+  - Burning: `from` is burning address, `to` is `address(0)`
+
+#### Approval
+- **Signature:** `event Approval(address indexed owner, address indexed spender, uint256 value)`
+- **Triggered by:** `approve()`, `permit()`, and ERC1363 `approveAndCall()`
+- **When:** When an allowance is set or updated for a spender
+  - Standard `approve()`: emitted with the new allowance value
+  - `permit()` signature approval: also emits `Approval` with the approved amount
+  - Note: `transferFrom()` does NOT emit `Approval` because it only spends allowance
+
+### Pausable Events
+
+#### Paused
+- **Signature:** `event Paused(address account)`
+- **Triggered by:** `pause()` function
+- **Who:** Only accounts with `PAUSER_ROLE` can trigger this
+- **When:** When the contract enters a paused state (all transfers/approvals stopped)
+
+#### Unpaused
+- **Signature:** `event Unpaused(address account)`
+- **Triggered by:** `unpause()` function
+- **Who:** Only accounts with `PAUSER_ROLE` can trigger this
+- **When:** When the contract exits a paused state (normal operations resume)
+
+### Access Control Events
+
+#### RoleGranted
+- **Signature:** `event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)`
+- **Triggered by:** `grantRole()` and constructor initialization
+- **When:** When a role is assigned to an account (via `_grantRole()`)
+- **Who:** Caller must have admin role for the role being granted
+
+#### RoleRevoked
+- **Signature:** `event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender)`
+- **Triggered by:** `revokeRole()` and `renounceRole()`
+- **When:** When a role is removed from an account (via `_revokeRole()`)
+- **Who:** Caller must have admin role, or be the account itself when renouncing
+
+#### RoleAdminChanged
+- **Signature:** `event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole)`
+- **Triggered by:** Changes to role administration (via `_setRoleAdmin()`)
+- **When:** When the admin role for a specific role is modified
+- **Notes:** Does NOT fire for initial role assignments in constructor
+
+### Restriction & Freezing Events
+
+#### UserRestrictionsUpdated
+- **Signature:** `event UserRestrictionsUpdated(address indexed account, Restriction restriction)`
+- **Triggered by:** `allowUser()`, `disallowUser()` (which call `_allowUser()`, `_resetUser()`)
+- **When:** When a user's restriction status changes
+- **Who:** Only accounts with `LIMITER_ROLE` can change restrictions
+- **Values:** `Restriction.DEFAULT` (0), `Restriction.BLOCKED` (1), `Restriction.ALLOWED` (2)
+
+#### Frozen
+- **Signature:** `event Frozen(address indexed account, uint256 amount)`
+- **Triggered by:** `freeze()` function
+- **Who:** Only accounts with `FREEZER_ROLE` can trigger this
+- **When:** When the frozen token amount for an account is set/updated (via `_setFrozen()`)
+- **Notes:** Setting `amount` to 0 effectively unfreezes tokens
+
+---
+
 ## Notes
 
 - **Restricted Token (RWA) Features**: This contract extends ERC20 with:
