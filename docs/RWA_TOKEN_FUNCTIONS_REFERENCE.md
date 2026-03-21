@@ -22,9 +22,9 @@ contract MyFirstTokenERC20RWA is
     ERC20Restricted
 ```
 
-**Custom Functions:** The contract also implements its own custom functions: `pause()`, `unpause()`, `mint()`, `freeze()`, `isUserAllowed()`, `allowUser()`, `disallowUser()`
+**Custom Functions:** The contract also implements its own custom functions: `pause()`, `unpause()`, `mint()`, `freeze()`, `isUserAllowed()`, `allowUser()`, `disallowUser()`, `forcedTransfer()`
 
-**Role Constants:** Custom role constants: `PAUSER_ROLE`, `MINTER_ROLE`, `FREEZER_ROLE`, `LIMITER_ROLE`
+**Role Constants:** Custom role constants: `PAUSER_ROLE`, `MINTER_ROLE`, `FREEZER_ROLE`, `LIMITER_ROLE`, `RECOVERY_ROLE`
 
 ---
 
@@ -133,6 +133,7 @@ These are constant getter functions that return role bytes32 values:
 - `PAUSER_ROLE() → bytes32`: Role for pausing/unpausing the contract - Custom
 - `FREEZER_ROLE() → bytes32`: Role for freezing/unfreezing accounts - Custom
 - `LIMITER_ROLE() → bytes32`: Role for setting transfer limits - Custom
+- `RECOVERY_ROLE() → bytes32`: Role for recovering tokens (clawbacks) - Custom
 
 ### Pause Status *(ERC20Pausable)*
 
@@ -318,6 +319,17 @@ Removes a user from the allowlist, restricting them from transacting. Requires `
 **Parameters:**
 - `user`: The address to disallow
 
+### Recovery & Clawbacks
+
+#### `forcedTransfer(address from, address to, uint256 amount)`
+**Parent:** `MyFirstTokenERC20RWA` (Custom)
+Allows a permitted authority to forcefully transfer tokens from one account to another, bypassing standard allowances. Essential for RWA tokens to handle legal court orders or lost private keys. Requires `RECOVERY_ROLE`.
+
+**Parameters:**
+- `from`: The account to recover tokens from
+- `to`: The account receiving the recovered tokens
+- `amount`: Amount of tokens to transfer
+
 ### Pause Control *(Custom + ERC20Pausable)*
 
 #### `pause()`
@@ -358,13 +370,14 @@ Renounces a role from the caller. The `callerConfirmation` parameter is typicall
 
 ## Constructor Parameters
 
-When deploying the contract, the constructor takes 5 addresses:
+When deploying the contract, the constructor takes 6 addresses:
 
 1. `defaultAdmin` - The initial admin with full control over roles (granted `DEFAULT_ADMIN_ROLE`)
 2. `pauser` - Address with pausing/unpausing capabilities (granted `PAUSER_ROLE`)
 3. `minter` - Address with token minting authority (granted `MINTER_ROLE`)
 4. `freezer` - Address with freezing capabilities (granted `FREEZER_ROLE`)
 5. `limiter` - Address with transfer limit/user allowlist capabilities (granted `LIMITER_ROLE`)
+6. `recoveryAdmin` - Address with forced transfer capabilities for clawbacks (granted `RECOVERY_ROLE`)
 
 The contract also initializes `ERC20` with name "MyFirstTokenERC20RWA" and symbol "1stRWA", and sets up `ERC20Permit` for EIP-2612 support.
 

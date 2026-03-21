@@ -16,8 +16,9 @@ contract MyFirstTokenERC20RWA is ERC20, ERC20Burnable, ERC20Pausable, AccessCont
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
     bytes32 public constant LIMITER_ROLE = keccak256("LIMITER_ROLE");
+    bytes32 public constant RECOVERY_ROLE = keccak256("RECOVERY_ROLE");
 
-    constructor(address defaultAdmin, address pauser, address minter, address freezer, address limiter)
+    constructor(address defaultAdmin, address pauser, address minter, address freezer, address limiter, address recoveryAdmin)
         ERC20("MyFirstTokenERC20RWA", "1stRWA")
         ERC20Permit("MyFirstTokenERC20RWA")
     {
@@ -26,6 +27,7 @@ contract MyFirstTokenERC20RWA is ERC20, ERC20Burnable, ERC20Pausable, AccessCont
         _grantRole(MINTER_ROLE, minter);
         _grantRole(FREEZER_ROLE, freezer);
         _grantRole(LIMITER_ROLE, limiter);
+        _grantRole(RECOVERY_ROLE, recoveryAdmin);
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -54,6 +56,10 @@ contract MyFirstTokenERC20RWA is ERC20, ERC20Burnable, ERC20Pausable, AccessCont
 
     function disallowUser(address user) public onlyRole(LIMITER_ROLE) {
         _resetUser(user);
+    }
+
+    function forcedTransfer(address from, address to, uint256 amount) public onlyRole(RECOVERY_ROLE) {
+        _transfer(from, to, amount);
     }
 
     // The following functions are overrides required by Solidity.
