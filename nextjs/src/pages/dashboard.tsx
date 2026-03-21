@@ -4,10 +4,14 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useState, useMemo } from 'react';
 import { parseUnits, formatUnits } from 'viem';
 import { useRwaToken, ROLES } from '../hooks/useRwaToken';
-import { StatCard, RoleSection, ActionCard, EventLogList } from '../components/DashboardComponents';
+import { StatCard, ActionCard, EventLogList } from '../components/DashboardComponents';
 import styles from '../styles/Dashboard.module.css';
 
+type TabType = 'overview' | 'transfer' | 'mint' | 'burn' | 'admin' | 'activity';
+
 const Dashboard: NextPage = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
     useTokenBalance,
     useTokenSupply,
@@ -33,28 +37,40 @@ const Dashboard: NextPage = () => {
     userAddress
   } = useRwaToken();
 
-  // State for forms
-  const [mintTo, setMintTo] = useState('');
-  const [mintAmount, setMintAmount] = useState('');
-  const [freezeUser, setFreezeUser] = useState('');
-  const [freezeAmount, setFreezeAmount] = useState('');
-  const [allowAddr, setAllowAddr] = useState('');
-  const [disallowAddr, setDisallowAddr] = useState('');
-  const [forcedFrom, setForcedFrom] = useState('');
-  const [forcedTo, setForcedTo] = useState('');
-  const [forcedAmount, setForcedAmount] = useState('');
+  // Form states
+  const [formData, setFormData] = useState({
+    // Transfer
+    transferTo: '',
+    transferAmount: '',
+    // Approve
+    approveSpender: '',
+    approveAmount: '',
+    // Burn
+    burnAmount: '',
+    // Mint
+    mintTo: '',
+    mintAmount: '',
+    // Freeze
+    freezeUser: '',
+    freezeAmount: '',
+    // Allowlist
+    allowAddr: '',
+    // Burn From
+    burnFromAddr: '',
+    burnFromAmount: '',
+    // Transfer From
+    tFromFrom: '',
+    tFromTo: '',
+    tFromAmount: '',
+    // Forced Transfer
+    forcedFrom: '',
+    forcedTo: '',
+    forcedAmount: ''
+  });
 
-  // New states for added operations
-  const [transferTo, setTransferTo] = useState('');
-  const [transferAmount, setTransferAmount] = useState('');
-  const [burnAmount, setBurnAmount] = useState('');
-  const [burnFromAddr, setBurnFromAddr] = useState('');
-  const [burnFromAmount, setBurnFromAmount] = useState('');
-  const [approveSpender, setApproveSpender] = useState('');
-  const [approveAmount, setApproveAmount] = useState('');
-  const [tFromFrom, setTFromFrom] = useState('');
-  const [tFromTo, setTFromTo] = useState('');
-  const [tFromAmount, setTFromAmount] = useState('');
+  const updateFormData = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   // Fetch data
   const { data: balance } = useTokenBalance(userAddress);
@@ -78,7 +94,22 @@ const Dashboard: NextPage = () => {
     FREEZER: !!hasFreezer,
     LIMITER: !!hasLimiter,
     RECOVERY: !!hasRecovery,
-  }), [hasAdmin, hasPauser, hasMinter, hasFreezer, hasLimiter, hasRecovery]);
+  }), [hasAdmin, hasPauser, hasMinter, hasFreezer, hasRecovery]);
+
+  const canMint = hasMinter || hasAdmin;
+  const canFreeze = hasFreezer || hasAdmin;
+  const canManageAllowlist = hasLimiter || hasAdmin;
+  const canRecover = hasRecovery || hasAdmin;
+  const canPause = hasAdmin || hasPauser;
+
+  const sidebarNav = [
+    { id: 'overview' as TabType, label: 'Overview', icon: '📊' },
+    { id: 'transfer' as TabType, label: 'Transfer', icon: '💸' },
+    { id: 'mint' as TabType, label: 'Mint', icon: '🪙', show: canMint },
+    { id: 'burn' as TabType, label: 'Burn', icon: '🔥' },
+    { id: 'admin' as TabType, label: 'Admin', icon: '🔐', show: canMint || canFreeze || canManageAllowlist || canRecover },
+    { id: 'activity' as TabType, label: 'Activity', icon: '📋' },
+  ].filter(item => item.show !== false);
 
   return (
     <div className={styles.dashboardContainer}>
@@ -86,200 +117,307 @@ const Dashboard: NextPage = () => {
         <title>RWA Token Dashboard</title>
       </Head>
 
-      <header className={styles.header}>
-        <h1 className={styles.title}>1stRWA Dashboard</h1>
-        <ConnectButton />
-      </header>
+      {/* Sidebar */}
+      <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.logo}>
+            <span className={styles.logoIcon}>◇</span>
+            {!sidebarCollapsed && <span className={styles.logoText}>1stRWA</span>}
+          </div>
+          <button 
+            className={styles.sidebarToggle}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? '→' : '←'}
+          </button>
+        </div>
 
-      <div className={styles.grid}>
-        {/* Statistics Section */}
-        <StatCard 
-          title="Total Supply" 
-          value={supply ? formatUnits(supply as bigint, 18) : '0'} 
-          label="1stRWA Tokens" 
-        />
-        <StatCard 
-          title="Your Balance" 
-          value={balance ? formatUnits(balance as bigint, 18) : '0'} 
-          label="Available" 
-        />
-        <StatCard 
-          title="Status" 
-          value={isPaused ? 'PAUSED' : 'ACTIVE'} 
-          label={isPaused ? 'Transfers Disabled' : 'Normal Operations'} 
-        />
+        <nav className={styles.sidebarNav}>
+          {sidebarNav.map(item => (
+            <button
+              key={item.id}
+              className={`${styles.navItem} ${activeTab === item.id ? styles.navItemActive : ''}`}
+              onClick={() => setActiveTab(item.id)}
+            >
+              <span className={styles.navIcon}>{item.icon}</span>
+              {!sidebarCollapsed && <span className={styles.navLabel}>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
 
-        {/* Roles Section */}
-        <RoleSection rolesStatus={rolesStatus} />
+        <div className={styles.sidebarFooter}>
+          <ConnectButton />
+        </div>
+      </aside>
 
-        {/* Personal Stats Section */}
-        <div className={styles.card}>
-          <div className={styles.cardTitle}>Account Status</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div className={styles.eventDetails}>
-              Restriction: <span style={{ color: isAllowed ? '#4ade80' : '#f87171' }}>
-                {isAllowed ? 'ALLOWED' : 'RESTRICTED'}
+      {/* Main Content */}
+      <main className={styles.mainContent}>
+        <div className={styles.contentHeader}>
+          <div>
+            <h1 className={styles.pageTitle}>
+              {sidebarNav.find(item => item.id === activeTab)?.label || 'Dashboard'}
+            </h1>
+            <p className={styles.pageSubtitle}>
+              {isPaused ? '⚠️ Contract is paused' : 'System operational'}
+            </p>
+          </div>
+          <div className={styles.headerStats}>
+            <div className={styles.headerStat}>
+              <span className={styles.headerStatValue}>
+                {supply ? formatUnits(supply as bigint, 4) : '0'} RWA
               </span>
+              <span className={styles.headerStatLabel}>Total Supply</span>
             </div>
-            <div className={styles.eventDetails}>
-              Frozen Amount: {frozenAmt ? formatUnits(frozenAmt as bigint, 18) : '0'} 1stRWA
-            </div>
-            <div className={styles.eventDetails} style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              {!isAllowed ? 'RESTRICTED: You cannot transfer tokens until an admin with LIMITER role approves your address. Contact an admin to be added to the allowlist.' : 'ALLOWED: Your account is approved and can perform token transfers.'}
+            <div className={styles.headerStat}>
+              <span className={styles.headerStatValue}>
+                {balance ? formatUnits(balance as bigint, 4) : '0'} RWA
+              </span>
+              <span className={styles.headerStatLabel}>Your Balance</span>
             </div>
           </div>
         </div>
 
-        {/* Global Controls (Admin/Pauser) */}
-        {(hasAdmin || hasPauser) && (
-          <div className={styles.card}>
-            <div className={styles.cardTitle}>Global Controls</div>
-            <p className={styles.eventDetails}>Emergency functions to stop or resume all token activities.</p>
-            <button 
-              className={styles.button} 
-              onClick={() => isPaused ? unpause() : pause()}
-              disabled={isWritePending || isConfirming}
-              style={{ background: isPaused ? 'var(--success)' : 'var(--error)' }}
-            >
-              {isPaused ? 'Unpause Contract' : 'Pause Contract'}
-            </button>
-          </div>
-        )}
+        <div className={styles.contentBody}>
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className={styles.overviewGrid}>
+              <div className={styles.quickStats}>
+                <div className={styles.statCardCompact}>
+                  <div className={styles.statCardIcon}>💰</div>
+                  <div className={styles.statCardContent}>
+                    <div className={styles.statCardValue}>
+                      {formatUnits((balance || 0n) as bigint, 4)} RWA
+                    </div>
+                    <div className={styles.statCardLabel}>Your Balance</div>
+                  </div>
+                </div>
+                <div className={styles.statCardCompact}>
+                  <div className={styles.statCardIcon}>📈</div>
+                  <div className={styles.statCardContent}>
+                    <div className={styles.statCardValue}>
+                      {formatUnits((supply || 0n) as bigint, 4)} RWA
+                    </div>
+                    <div className={styles.statCardLabel}>Total Supply</div>
+                  </div>
+                </div>
+                <div className={`${styles.statCardCompact} ${isPaused ? styles.statCardWarning : styles.statCardSuccess}`}>
+                  <div className={styles.statCardIcon}>{isPaused ? '⏸️' : '▶️'}</div>
+                  <div className={styles.statCardContent}>
+                    <div className={styles.statCardValue}>
+                      {isPaused ? 'Paused' : 'Active'}
+                    </div>
+                    <div className={styles.statCardLabel}>Contract Status</div>
+                  </div>
+                </div>
+              </div>
 
-        {/* Specialized Actions */}
-        {(hasMinter || hasAdmin) && (
-          <ActionCard 
-            title="Mint Tokens"
-            description={hasMinter ? "Create new tokens and send them to a specific address." : "ADMIN: Requires MINTER_ROLE but shown for management."}
-            inputs={[
-              { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: mintTo, onChange: setMintTo },
-              { label: 'Amount', placeholder: '0.0', type: 'number', value: mintAmount, onChange: setMintAmount },
-            ]}
-            buttonText="Mint 1stRWA"
-            onAction={() => mint(mintTo, parseUnits(mintAmount, 18))}
-            isLoading={isWritePending || isConfirming}
-          />
-        )}
+              <div className={styles.accountStatus}>
+                <div className={styles.statusHeader}>
+                  <h3>Account Status</h3>
+                  <div className={`${styles.statusBadge} ${isAllowed ? styles.statusBadgeAllowed : styles.statusBadgeRestricted}`}>
+                    {isAllowed ? '✓ Allowed' : '⛔ Restricted'}
+                  </div>
+                </div>
+                <div className={styles.statusDetails}>
+                  <div className={styles.statusRow}>
+                    <span>Frozen Amount:</span>
+                    <span className={styles.statusValue}>
+                      {formatUnits((frozenAmt || 0n) as bigint, 4)} RWA
+                    </span>
+                  </div>
+                  <div className={styles.statusMessage}>
+                    {isAllowed 
+                      ? 'Your account is approved and can perform token transfers.'
+                      : 'You cannot transfer tokens until an admin with LIMITER role approves your address.'
+                    }
+                  </div>
+                </div>
+                {canPause && (
+                  <button
+                    className={`${styles.emergencyButton} ${isPaused ? styles.unpauseButton : styles.pauseButton}`}
+                    onClick={() => isPaused ? unpause() : pause()}
+                    disabled={isWritePending || isConfirming}
+                  >
+                    {isPaused ? '▶️ Resume Operations' : '⏸️ Emergency Pause'}
+                  </button>
+                )}
+              </div>
 
-        {(hasFreezer || hasAdmin) && (
-          <ActionCard 
-            title="Freeze Balance"
-            description={hasFreezer ? "Lock a specific amount of tokens in a user's account." : "ADMIN: Requires FREEZER_ROLE but shown for management."}
-            inputs={[
-              { label: 'User Address', placeholder: '0x...', type: 'text', value: freezeUser, onChange: setFreezeUser },
-              { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: freezeAmount, onChange: setFreezeAmount },
-            ]}
-            buttonText="Set Frozen Amount"
-            onAction={() => freeze(freezeUser, parseUnits(freezeAmount, 18))}
-            isLoading={isWritePending || isConfirming}
-          />
-        )}
+              <div className={styles.rolesPanel}>
+                <h3>Your Roles</h3>
+                <div className={styles.rolesGrid}>
+                  {Object.entries(ROLES).map(([name, hash]) => (
+                    <div 
+                      key={name} 
+                      className={`${styles.roleBadge} ${rolesStatus[name] ? styles.roleBadgeActive : ''}`}
+                    >
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {(hasLimiter || hasAdmin) && (
-          <ActionCard 
-            title="Manage Allowlist"
-            description={hasLimiter ? "Control which users are allowed to transact with the token." : "ADMIN: Requires LIMITER_ROLE but shown for management."}
-            inputs={[
-              { label: 'Address', placeholder: '0x...', type: 'text', value: allowAddr, onChange: setAllowAddr },
-            ]}
-            actions={[
-              { text: 'Allow User', onClick: () => allowUser(allowAddr) },
-              { text: 'Disallow User', onClick: () => disallowUser(allowAddr), variant: 'danger' },
-            ]}
-            isLoading={isWritePending || isConfirming}
-          />
-        )}
+          {/* Transfer Tab */}
+          {activeTab === 'transfer' && (
+            <div className={styles.actionsGrid}>
+              <ActionCard
+                title="Quick Transfer"
+                description="Send tokens to any address"
+                icon="💸"
+                inputs={[
+                  { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.transferTo, onChange: (v) => updateFormData('transferTo', v) },
+                  { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.transferAmount, onChange: (v) => updateFormData('transferAmount', v) },
+                ]}
+                buttonText="Transfer"
+                onAction={() => transfer(formData.transferTo, parseUnits(formData.transferAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+                disabled={!isAllowed}
+              />
 
-        {/* Standard User Actions */}
-        <ActionCard 
-          title="Transfer Tokens"
-          description="Send your tokens to another address."
-          inputs={[
-            { label: 'Recipient', placeholder: '0x...', type: 'text', value: transferTo, onChange: setTransferTo },
-            { label: 'Amount', placeholder: '0.0', type: 'number', value: transferAmount, onChange: setTransferAmount },
-          ]}
-          buttonText="Transfer 1stRWA"
-          onAction={() => transfer(transferTo, parseUnits(transferAmount, 18))}
-          isLoading={isWritePending || isConfirming}
-        />
+              <ActionCard
+                title="Approve Spender"
+                description="Allow another address to spend your tokens"
+                icon="✅"
+                inputs={[
+                  { label: 'Spender Address', placeholder: '0x...', type: 'text', value: formData.approveSpender, onChange: (v) => updateFormData('approveSpender', v) },
+                  { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.approveAmount, onChange: (v) => updateFormData('approveAmount', v) },
+                ]}
+                buttonText="Approve"
+                onAction={() => approve(formData.approveSpender, parseUnits(formData.approveAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+              />
 
-        <ActionCard 
-          title="Approve Spender"
-          description="Allow another address to spend tokens on your behalf."
-          inputs={[
-            { label: 'Spender Address', placeholder: '0x...', type: 'text', value: approveSpender, onChange: setApproveSpender },
-            { label: 'Amount', placeholder: '0.0', type: 'number', value: approveAmount, onChange: setApproveAmount },
-          ]}
-          buttonText="Approve"
-          onAction={() => approve(approveSpender, parseUnits(approveAmount, 18))}
-          isLoading={isWritePending || isConfirming}
-        />
+              <ActionCard
+                title="Transfer From"
+                description="Transfer tokens from another account (requires allowance)"
+                icon="🔄"
+                inputs={[
+                  { label: 'From Address', placeholder: '0x...', type: 'text', value: formData.tFromFrom, onChange: (v) => updateFormData('tFromFrom', v) },
+                  { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.tFromTo, onChange: (v) => updateFormData('tFromTo', v) },
+                  { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.tFromAmount, onChange: (v) => updateFormData('tFromAmount', v) },
+                ]}
+                buttonText="Transfer From"
+                onAction={() => transferFrom(formData.tFromFrom, formData.tFromTo, parseUnits(formData.tFromAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+              />
+            </div>
+          )}
 
-        <ActionCard 
-          title="Burn Tokens"
-          description="Permanently destroy your own tokens to reduce supply."
-          inputs={[
-            { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: burnAmount, onChange: setBurnAmount },
-          ]}
-          buttonText="Burn My Tokens"
-          onAction={() => burn(parseUnits(burnAmount, 18))}
-          isLoading={isWritePending || isConfirming}
-          style={{ border: '1px solid var(--error)' }}
-        />
+          {/* Mint Tab */}
+          {activeTab === 'mint' && canMint && (
+            <div className={styles.actionsGrid}>
+              <ActionCard
+                title="Mint New Tokens"
+                description="Create new tokens and send to an address"
+                icon="🪙"
+                accent="primary"
+                inputs={[
+                  { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.mintTo, onChange: (v) => updateFormData('mintTo', v) },
+                  { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.mintAmount, onChange: (v) => updateFormData('mintAmount', v) },
+                ]}
+                buttonText="Mint Tokens"
+                onAction={() => mint(formData.mintTo, parseUnits(formData.mintAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+              />
+            </div>
+          )}
 
-        {/* Advanced/Role-based Actions */}
-        <ActionCard 
-          title="Burn From Address"
-          description="Burn tokens from another account (requires allowance)."
-          inputs={[
-            { label: 'Account', placeholder: '0x...', type: 'text', value: burnFromAddr, onChange: setBurnFromAddr },
-            { label: 'Amount', placeholder: '0.0', type: 'number', value: burnFromAmount, onChange: setBurnFromAmount },
-          ]}
-          buttonText="Burn From"
-          onAction={() => burnFrom(burnFromAddr, parseUnits(burnFromAmount, 18))}
-          isLoading={isWritePending || isConfirming}
-          style={{ border: '1px solid var(--error)' }}
-        />
+          {/* Burn Tab */}
+          {activeTab === 'burn' && (
+            <div className={styles.actionsGrid}>
+              <ActionCard
+                title="Burn Your Tokens"
+                description="Permanently destroy your own tokens"
+                icon="🔥"
+                accent="danger"
+                inputs={[
+                  { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnAmount, onChange: (v) => updateFormData('burnAmount', v) },
+                ]}
+                buttonText="Burn Tokens"
+                onAction={() => burn(parseUnits(formData.burnAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+              />
 
-        <ActionCard 
-          title="Advanced Transfer"
-          description="Transfer tokens between two accounts (requires allowance)."
-          inputs={[
-            { label: 'From Address', placeholder: '0x...', type: 'text', value: tFromFrom, onChange: setTFromFrom },
-            { label: 'To Address', placeholder: '0x...', type: 'text', value: tFromTo, onChange: setTFromTo },
-            { label: 'Amount', placeholder: '0.0', type: 'number', value: tFromAmount, onChange: setTFromAmount },
-          ]}
-          buttonText="Transfer From"
-          onAction={() => transferFrom(tFromFrom, tFromTo, parseUnits(tFromAmount, 18))}
-          isLoading={isWritePending || isConfirming}
-        />
+              <ActionCard
+                title="Burn From Address"
+                description="Burn tokens from another account (requires allowance)"
+                icon="🔥"
+                accent="danger"
+                inputs={[
+                  { label: 'Account Address', placeholder: '0x...', type: 'text', value: formData.burnFromAddr, onChange: (v) => updateFormData('burnFromAddr', v) },
+                  { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnFromAmount, onChange: (v) => updateFormData('burnFromAmount', v) },
+                ]}
+                buttonText="Burn From"
+                onAction={() => burnFrom(formData.burnFromAddr, parseUnits(formData.burnFromAmount, 18))}
+                isLoading={isWritePending || isConfirming}
+              />
+            </div>
+          )}
 
-        <ActionCard 
-          title="Recovery Transfer"
-          description={hasRecovery 
-            ? "Forcefully transfer tokens from one account to another (Clawback)."
-            : "Requires RECOVERY_ROLE to forcefully transfer tokens between accounts."
-          }
-          inputs={[
-            { label: 'From Address', placeholder: '0x...', type: 'text', value: forcedFrom, onChange: setForcedFrom },
-            { label: 'To Address', placeholder: '0x...', type: 'text', value: forcedTo, onChange: setForcedTo },
-            { label: 'Amount', placeholder: '0.0', type: 'number', value: forcedAmount, onChange: setForcedAmount },
-          ]}
-          buttonText="Execute Forced Transfer"
-          onAction={() => forcedTransfer(forcedFrom, forcedTo, parseUnits(forcedAmount, 18))}
-          disabled={!(hasRecovery || hasAdmin)}
-          isLoading={isWritePending || isConfirming}
-          style={{ border: '2px solid var(--error)' }}
-        />
+          {/* Admin Tab */}
+          {activeTab === 'admin' && (canMint || canFreeze || canManageAllowlist || canRecover) && (
+            <div className={styles.actionsGrid}>
+              {canManageAllowlist && (
+                <ActionCard
+                  title="Manage Allowlist"
+                  description="Control which users can transact"
+                  icon="📋"
+                  inputs={[
+                    { label: 'Address', placeholder: '0x...', type: 'text', value: formData.allowAddr, onChange: (v) => updateFormData('allowAddr', v) },
+                  ]}
+                  actions={[
+                    { text: 'Allow User', onClick: () => allowUser(formData.allowAddr), variant: 'primary' },
+                    { text: 'Disallow User', onClick: () => disallowUser(formData.allowAddr), variant: 'danger' },
+                  ]}
+                  isLoading={isWritePending || isConfirming}
+                />
+              )}
 
-        {/* Real-time Events feed */}
-        <EventLogList events={events} />
-      </div>
+              {canFreeze && (
+                <ActionCard
+                  title="Freeze Balance"
+                  description="Lock tokens in a user's account"
+                  icon="❄️"
+                  accent="warning"
+                  inputs={[
+                    { label: 'User Address', placeholder: '0x...', type: 'text', value: formData.freezeUser, onChange: (v) => updateFormData('freezeUser', v) },
+                    { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: formData.freezeAmount, onChange: (v) => updateFormData('freezeAmount', v) },
+                  ]}
+                  buttonText="Set Frozen Amount"
+                  onAction={() => freeze(formData.freezeUser, parseUnits(formData.freezeAmount, 18))}
+                  isLoading={isWritePending || isConfirming}
+                />
+              )}
 
-      <footer style={{ marginTop: '4rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-        <p>Real World Asset Token Management System</p>
-        <p style={{ marginTop: '0.5rem' }}>Contract: 0x4AA...6aB4</p>
-      </footer>
+              {canRecover && (
+                <ActionCard
+                  title="Recovery Transfer"
+                  description="Forcefully transfer tokens between accounts"
+                  icon="🛡️"
+                  accent="danger"
+                  inputs={[
+                    { label: 'From Address', placeholder: '0x...', type: 'text', value: formData.forcedFrom, onChange: (v) => updateFormData('forcedFrom', v) },
+                    { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.forcedTo, onChange: (v) => updateFormData('forcedTo', v) },
+                    { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.forcedAmount, onChange: (v) => updateFormData('forcedAmount', v) },
+                  ]}
+                  buttonText="Execute Transfer"
+                  onAction={() => forcedTransfer(formData.forcedFrom, formData.forcedTo, parseUnits(formData.forcedAmount, 18))}
+                  isLoading={isWritePending || isConfirming}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Activity Tab */}
+          {activeTab === 'activity' && (
+            <div className={styles.activityContainer}>
+              <EventLogList events={events} />
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
