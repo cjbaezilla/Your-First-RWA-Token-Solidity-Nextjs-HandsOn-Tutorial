@@ -7,7 +7,7 @@ import { useRwaToken, ROLES } from '../hooks/useRwaToken';
 import { StatCard, ActionCard, EventLogList } from '../components/DashboardComponents';
 import styles from '../styles/Dashboard.module.css';
 
-type TabType = 'overview' | 'transfer' | 'mint' | 'burn' | 'admin' | 'activity';
+type TabType = 'overview' | 'transfer' | 'supply' | 'admin' | 'activity';
 
 const Dashboard: NextPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -118,8 +118,7 @@ const Dashboard: NextPage = () => {
   const sidebarNav = [
     { id: 'overview' as TabType, label: 'Overview', icon: '📊' },
     { id: 'transfer' as TabType, label: 'Transfer', icon: '💸' },
-    { id: 'mint' as TabType, label: 'Mint', icon: '🪙', show: canMint },
-    { id: 'burn' as TabType, label: 'Burn', icon: '🔥' },
+    { id: 'supply' as TabType, label: 'Supply', icon: '💰' },
     { id: 'activity' as TabType, label: 'Activity', icon: '📋' },
   ].filter(item => item.show !== false);
 
@@ -337,28 +336,25 @@ const Dashboard: NextPage = () => {
             </div>
           )}
 
-          {/* Mint Tab */}
-          {activeTab === 'mint' && canMint && (
+          {/* Supply Tab */}
+          {activeTab === 'supply' && (
             <div className={styles.actionsGrid}>
-              <ActionCard
-                title="Mint New Tokens"
-                description="Create new tokens and send to an address"
-                icon="🪙"
-                accent="primary"
-                inputs={[
-                  { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.mintTo, onChange: (v) => updateFormData('mintTo', v) },
-                  { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.mintAmount, onChange: (v) => updateFormData('mintAmount', v) },
-                ]}
-                 buttonText="Mint Tokens"
-                 onAction={() => mint(formData.mintTo, parseAmount(formData.mintAmount))}
-                isLoading={isWritePending || isConfirming}
-              />
-            </div>
-          )}
+              {canMint && (
+                <ActionCard
+                  title="Mint New Tokens"
+                  description="Create new tokens and send to an address"
+                  icon="🪙"
+                  accent="primary"
+                  inputs={[
+                    { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.mintTo, onChange: (v) => updateFormData('mintTo', v) },
+                    { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.mintAmount, onChange: (v) => updateFormData('mintAmount', v) },
+                  ]}
+                  buttonText="Mint Tokens"
+                  onAction={() => mint(formData.mintTo, parseAmount(formData.mintAmount))}
+                  isLoading={isWritePending || isConfirming}
+                />
+              )}
 
-          {/* Burn Tab */}
-          {activeTab === 'burn' && (
-            <div className={styles.actionsGrid}>
               <ActionCard
                 title="Burn Your Tokens"
                 description="Permanently destroy your own tokens"
@@ -367,8 +363,8 @@ const Dashboard: NextPage = () => {
                 inputs={[
                   { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnAmount, onChange: (v) => updateFormData('burnAmount', v) },
                 ]}
-                 buttonText="Burn Tokens"
-                 onAction={() => burn(parseAmount(formData.burnAmount))}
+                buttonText="Burn Tokens"
+                onAction={() => burn(parseAmount(formData.burnAmount))}
                 isLoading={isWritePending || isConfirming}
               />
 
@@ -381,8 +377,8 @@ const Dashboard: NextPage = () => {
                   { label: 'Account Address', placeholder: '0x...', type: 'text', value: formData.burnFromAddr, onChange: (v) => updateFormData('burnFromAddr', v) },
                   { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnFromAmount, onChange: (v) => updateFormData('burnFromAmount', v) },
                 ]}
-                 buttonText="Burn From"
-                 onAction={() => burnFrom(formData.burnFromAddr, parseAmount(formData.burnFromAmount))}
+                buttonText="Burn From"
+                onAction={() => burnFrom(formData.burnFromAddr, parseAmount(formData.burnFromAmount))}
                 isLoading={isWritePending || isConfirming}
               />
             </div>
