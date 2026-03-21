@@ -120,7 +120,6 @@ const Dashboard: NextPage = () => {
     { id: 'transfer' as TabType, label: 'Transfer', icon: '💸' },
     { id: 'mint' as TabType, label: 'Mint', icon: '🪙', show: canMint },
     { id: 'burn' as TabType, label: 'Burn', icon: '🔥' },
-    { id: 'admin' as TabType, label: 'Admin', icon: '🔐', show: canMint || canFreeze || canManageAllowlist || canRecover },
     { id: 'activity' as TabType, label: 'Activity', icon: '📋' },
   ].filter(item => item.show !== false);
 
@@ -223,13 +222,12 @@ const Dashboard: NextPage = () => {
           {activeTab === 'overview' && (
             <div className={styles.overviewGrid}>
 
-
               <div className={styles.rolesPanel}>
                 <h3>Your Roles</h3>
                 <div className={styles.rolesGrid}>
                   {Object.entries(ROLES).map(([name, hash]) => (
-                    <div 
-                      key={name} 
+                    <div
+                      key={name}
                       className={`${styles.roleBadge} ${rolesStatus[name] ? styles.roleBadgeActive : ''}`}
                     >
                       {name}
@@ -237,6 +235,59 @@ const Dashboard: NextPage = () => {
                   ))}
                 </div>
               </div>
+
+              {(canManageAllowlist || canFreeze || canRecover) && (
+                <div className={styles.actionsGrid}>
+                  {canManageAllowlist && (
+                    <ActionCard
+                      title="Manage Allowlist"
+                      description="Control which users can transact"
+                      icon="📋"
+                      inputs={[
+                        { label: 'Address', placeholder: '0x...', type: 'text', value: formData.allowAddr, onChange: (v) => updateFormData('allowAddr', v) },
+                      ]}
+                      actions={[
+                        { text: 'Allow User', onClick: () => allowUser(formData.allowAddr), variant: 'primary' },
+                        { text: 'Disallow User', onClick: () => disallowUser(formData.allowAddr), variant: 'danger' },
+                      ]}
+                      isLoading={isWritePending || isConfirming}
+                    />
+                  )}
+
+                  {canFreeze && (
+                    <ActionCard
+                      title="Freeze Balance"
+                      description="Lock tokens in a user's account"
+                      icon="❄️"
+                      accent="warning"
+                      inputs={[
+                        { label: 'User Address', placeholder: '0x...', type: 'text', value: formData.freezeUser, onChange: (v) => updateFormData('freezeUser', v) },
+                        { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: formData.freezeAmount, onChange: (v) => updateFormData('freezeAmount', v) },
+                      ]}
+                       buttonText="Set Frozen Amount"
+                       onAction={() => freeze(formData.freezeUser, parseAmount(formData.freezeAmount))}
+                      isLoading={isWritePending || isConfirming}
+                    />
+                  )}
+
+                  {canRecover && (
+                    <ActionCard
+                      title="Recovery Transfer"
+                      description="Forcefully transfer tokens between accounts"
+                      icon="🛡️"
+                      accent="danger"
+                      inputs={[
+                        { label: 'From Address', placeholder: '0x...', type: 'text', value: formData.forcedFrom, onChange: (v) => updateFormData('forcedFrom', v) },
+                        { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.forcedTo, onChange: (v) => updateFormData('forcedTo', v) },
+                        { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.forcedAmount, onChange: (v) => updateFormData('forcedAmount', v) },
+                      ]}
+                       buttonText="Execute Transfer"
+                       onAction={() => forcedTransfer(formData.forcedFrom, formData.forcedTo, parseAmount(formData.forcedAmount))}
+                      isLoading={isWritePending || isConfirming}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -337,59 +388,7 @@ const Dashboard: NextPage = () => {
             </div>
           )}
 
-          {/* Admin Tab */}
-          {activeTab === 'admin' && (canMint || canFreeze || canManageAllowlist || canRecover) && (
-            <div className={styles.actionsGrid}>
-              {canManageAllowlist && (
-                <ActionCard
-                  title="Manage Allowlist"
-                  description="Control which users can transact"
-                  icon="📋"
-                  inputs={[
-                    { label: 'Address', placeholder: '0x...', type: 'text', value: formData.allowAddr, onChange: (v) => updateFormData('allowAddr', v) },
-                  ]}
-                  actions={[
-                    { text: 'Allow User', onClick: () => allowUser(formData.allowAddr), variant: 'primary' },
-                    { text: 'Disallow User', onClick: () => disallowUser(formData.allowAddr), variant: 'danger' },
-                  ]}
-                  isLoading={isWritePending || isConfirming}
-                />
-              )}
 
-              {canFreeze && (
-                <ActionCard
-                  title="Freeze Balance"
-                  description="Lock tokens in a user's account"
-                  icon="❄️"
-                  accent="warning"
-                  inputs={[
-                    { label: 'User Address', placeholder: '0x...', type: 'text', value: formData.freezeUser, onChange: (v) => updateFormData('freezeUser', v) },
-                    { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: formData.freezeAmount, onChange: (v) => updateFormData('freezeAmount', v) },
-                  ]}
-                   buttonText="Set Frozen Amount"
-                   onAction={() => freeze(formData.freezeUser, parseAmount(formData.freezeAmount))}
-                  isLoading={isWritePending || isConfirming}
-                />
-              )}
-
-              {canRecover && (
-                <ActionCard
-                  title="Recovery Transfer"
-                  description="Forcefully transfer tokens between accounts"
-                  icon="🛡️"
-                  accent="danger"
-                  inputs={[
-                    { label: 'From Address', placeholder: '0x...', type: 'text', value: formData.forcedFrom, onChange: (v) => updateFormData('forcedFrom', v) },
-                    { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.forcedTo, onChange: (v) => updateFormData('forcedTo', v) },
-                    { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.forcedAmount, onChange: (v) => updateFormData('forcedAmount', v) },
-                  ]}
-                   buttonText="Execute Transfer"
-                   onAction={() => forcedTransfer(formData.forcedFrom, formData.forcedTo, parseAmount(formData.forcedAmount))}
-                  isLoading={isWritePending || isConfirming}
-                />
-              )}
-            </div>
-          )}
 
           {/* Activity Tab */}
           {activeTab === 'activity' && (

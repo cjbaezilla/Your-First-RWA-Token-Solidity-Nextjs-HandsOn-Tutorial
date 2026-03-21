@@ -439,6 +439,19 @@
 .actionsGrid {
   display: grid;
   gap: 1.5rem;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .actionsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .actionsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .activityContainer {
@@ -538,6 +551,8 @@
 
 .buttonContainer {
   margin-top: 0.5rem;
+  display: flex;
+  gap: 0.75rem;
 }
 
 .button {
