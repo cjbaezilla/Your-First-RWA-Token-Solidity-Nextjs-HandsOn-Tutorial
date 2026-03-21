@@ -19,6 +19,7 @@ const Dashboard: NextPage = () => {
     usePaused,
     useFrozenAmount,
     useHasRole,
+    useTokenDecimals,
     mint,
     freeze,
     allowUser,
@@ -78,6 +79,7 @@ const Dashboard: NextPage = () => {
   const { data: isPaused } = usePaused();
   const { data: isAllowed } = useIsUserAllowed(userAddress);
   const { data: frozenAmt } = useFrozenAmount(userAddress);
+  const { data: tokenDecimals } = useTokenDecimals();
 
   // Check roles
   const { data: hasAdmin } = useHasRole(ROLES.ADMIN, userAddress);
@@ -95,6 +97,17 @@ const Dashboard: NextPage = () => {
     LIMITER: !!hasLimiter,
     RECOVERY: !!hasRecovery,
   }), [hasAdmin, hasPauser, hasMinter, hasFreezer, hasRecovery]);
+
+  const decimals = tokenDecimals ?? 18n;
+
+  const formatAmount = (value: bigint | undefined | null) => {
+    if (!value) return '0';
+    return formatUnits(value, Number(decimals));
+  };
+
+  const parseAmount = (value: string) => {
+    return parseUnits(value, Number(decimals));
+  };
 
   const canMint = hasMinter || hasAdmin;
   const canFreeze = hasFreezer || hasAdmin;
@@ -161,20 +174,20 @@ const Dashboard: NextPage = () => {
               {isPaused ? '⚠️ Contract is paused' : 'System operational'}
             </p>
           </div>
-          <div className={styles.headerStats}>
-            <div className={styles.headerStat}>
-              <span className={styles.headerStatValue}>
-                {supply ? formatUnits(supply as bigint, 4) : '0'} RWA
-              </span>
-              <span className={styles.headerStatLabel}>Total Supply</span>
-            </div>
-            <div className={styles.headerStat}>
-              <span className={styles.headerStatValue}>
-                {balance ? formatUnits(balance as bigint, 4) : '0'} RWA
-              </span>
-              <span className={styles.headerStatLabel}>Your Balance</span>
-            </div>
-          </div>
+             <div className={styles.headerStats}>
+               <div className={styles.headerStat}>
+                 <span className={styles.headerStatValue}>
+                   {formatAmount(supply)} RWA
+                 </span>
+                 <span className={styles.headerStatLabel}>Total Supply</span>
+               </div>
+               <div className={styles.headerStat}>
+                 <span className={styles.headerStatValue}>
+                   {formatAmount(balance)} RWA
+                 </span>
+                 <span className={styles.headerStatLabel}>Your Balance</span>
+               </div>
+             </div>
         </div>
 
         <div className={styles.contentBody}>
@@ -184,21 +197,21 @@ const Dashboard: NextPage = () => {
               <div className={styles.quickStats}>
                 <div className={styles.statCardCompact}>
                   <div className={styles.statCardIcon}>💰</div>
-                  <div className={styles.statCardContent}>
-                    <div className={styles.statCardValue}>
-                      {formatUnits((balance || 0n) as bigint, 4)} RWA
-                    </div>
-                    <div className={styles.statCardLabel}>Your Balance</div>
-                  </div>
+                 <div className={styles.statCardContent}>
+                     <div className={styles.statCardValue}>
+                       {formatAmount(balance)} RWA
+                     </div>
+                     <div className={styles.statCardLabel}>Your Balance</div>
+                   </div>
                 </div>
                 <div className={styles.statCardCompact}>
                   <div className={styles.statCardIcon}>📈</div>
-                  <div className={styles.statCardContent}>
-                    <div className={styles.statCardValue}>
-                      {formatUnits((supply || 0n) as bigint, 4)} RWA
-                    </div>
-                    <div className={styles.statCardLabel}>Total Supply</div>
-                  </div>
+                 <div className={styles.statCardContent}>
+                     <div className={styles.statCardValue}>
+                       {formatAmount(supply)} RWA
+                     </div>
+                     <div className={styles.statCardLabel}>Total Supply</div>
+                   </div>
                 </div>
                 <div className={`${styles.statCardCompact} ${isPaused ? styles.statCardWarning : styles.statCardSuccess}`}>
                   <div className={styles.statCardIcon}>{isPaused ? '⏸️' : '▶️'}</div>
@@ -219,12 +232,12 @@ const Dashboard: NextPage = () => {
                   </div>
                 </div>
                 <div className={styles.statusDetails}>
-                  <div className={styles.statusRow}>
-                    <span>Frozen Amount:</span>
-                    <span className={styles.statusValue}>
-                      {formatUnits((frozenAmt || 0n) as bigint, 4)} RWA
-                    </span>
-                  </div>
+                   <div className={styles.statusRow}>
+                     <span>Frozen Amount:</span>
+                     <span className={styles.statusValue}>
+                       {formatAmount(frozenAmt)} RWA
+                     </span>
+                   </div>
                   <div className={styles.statusMessage}>
                     {isAllowed 
                       ? 'Your account is approved and can perform token transfers.'
@@ -270,8 +283,8 @@ const Dashboard: NextPage = () => {
                   { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.transferTo, onChange: (v) => updateFormData('transferTo', v) },
                   { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.transferAmount, onChange: (v) => updateFormData('transferAmount', v) },
                 ]}
-                buttonText="Transfer"
-                onAction={() => transfer(formData.transferTo, parseUnits(formData.transferAmount, 18))}
+                 buttonText="Transfer"
+                 onAction={() => transfer(formData.transferTo, parseAmount(formData.transferAmount))}
                 isLoading={isWritePending || isConfirming}
                 disabled={!isAllowed}
               />
@@ -284,8 +297,8 @@ const Dashboard: NextPage = () => {
                   { label: 'Spender Address', placeholder: '0x...', type: 'text', value: formData.approveSpender, onChange: (v) => updateFormData('approveSpender', v) },
                   { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.approveAmount, onChange: (v) => updateFormData('approveAmount', v) },
                 ]}
-                buttonText="Approve"
-                onAction={() => approve(formData.approveSpender, parseUnits(formData.approveAmount, 18))}
+                 buttonText="Approve"
+                 onAction={() => approve(formData.approveSpender, parseAmount(formData.approveAmount))}
                 isLoading={isWritePending || isConfirming}
               />
 
@@ -298,8 +311,8 @@ const Dashboard: NextPage = () => {
                   { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.tFromTo, onChange: (v) => updateFormData('tFromTo', v) },
                   { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.tFromAmount, onChange: (v) => updateFormData('tFromAmount', v) },
                 ]}
-                buttonText="Transfer From"
-                onAction={() => transferFrom(formData.tFromFrom, formData.tFromTo, parseUnits(formData.tFromAmount, 18))}
+                 buttonText="Transfer From"
+                 onAction={() => transferFrom(formData.tFromFrom, formData.tFromTo, parseAmount(formData.tFromAmount))}
                 isLoading={isWritePending || isConfirming}
               />
             </div>
@@ -317,8 +330,8 @@ const Dashboard: NextPage = () => {
                   { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: formData.mintTo, onChange: (v) => updateFormData('mintTo', v) },
                   { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.mintAmount, onChange: (v) => updateFormData('mintAmount', v) },
                 ]}
-                buttonText="Mint Tokens"
-                onAction={() => mint(formData.mintTo, parseUnits(formData.mintAmount, 18))}
+                 buttonText="Mint Tokens"
+                 onAction={() => mint(formData.mintTo, parseAmount(formData.mintAmount))}
                 isLoading={isWritePending || isConfirming}
               />
             </div>
@@ -335,8 +348,8 @@ const Dashboard: NextPage = () => {
                 inputs={[
                   { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnAmount, onChange: (v) => updateFormData('burnAmount', v) },
                 ]}
-                buttonText="Burn Tokens"
-                onAction={() => burn(parseUnits(formData.burnAmount, 18))}
+                 buttonText="Burn Tokens"
+                 onAction={() => burn(parseAmount(formData.burnAmount))}
                 isLoading={isWritePending || isConfirming}
               />
 
@@ -349,8 +362,8 @@ const Dashboard: NextPage = () => {
                   { label: 'Account Address', placeholder: '0x...', type: 'text', value: formData.burnFromAddr, onChange: (v) => updateFormData('burnFromAddr', v) },
                   { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: formData.burnFromAmount, onChange: (v) => updateFormData('burnFromAmount', v) },
                 ]}
-                buttonText="Burn From"
-                onAction={() => burnFrom(formData.burnFromAddr, parseUnits(formData.burnFromAmount, 18))}
+                 buttonText="Burn From"
+                 onAction={() => burnFrom(formData.burnFromAddr, parseAmount(formData.burnFromAmount))}
                 isLoading={isWritePending || isConfirming}
               />
             </div>
@@ -385,8 +398,8 @@ const Dashboard: NextPage = () => {
                     { label: 'User Address', placeholder: '0x...', type: 'text', value: formData.freezeUser, onChange: (v) => updateFormData('freezeUser', v) },
                     { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: formData.freezeAmount, onChange: (v) => updateFormData('freezeAmount', v) },
                   ]}
-                  buttonText="Set Frozen Amount"
-                  onAction={() => freeze(formData.freezeUser, parseUnits(formData.freezeAmount, 18))}
+                   buttonText="Set Frozen Amount"
+                   onAction={() => freeze(formData.freezeUser, parseAmount(formData.freezeAmount))}
                   isLoading={isWritePending || isConfirming}
                 />
               )}
@@ -402,8 +415,8 @@ const Dashboard: NextPage = () => {
                     { label: 'To Address', placeholder: '0x...', type: 'text', value: formData.forcedTo, onChange: (v) => updateFormData('forcedTo', v) },
                     { label: 'Amount (RWA)', placeholder: '0.0', type: 'number', value: formData.forcedAmount, onChange: (v) => updateFormData('forcedAmount', v) },
                   ]}
-                  buttonText="Execute Transfer"
-                  onAction={() => forcedTransfer(formData.forcedFrom, formData.forcedTo, parseUnits(formData.forcedAmount, 18))}
+                   buttonText="Execute Transfer"
+                   onAction={() => forcedTransfer(formData.forcedFrom, formData.forcedTo, parseAmount(formData.forcedAmount))}
                   isLoading={isWritePending || isConfirming}
                 />
               )}

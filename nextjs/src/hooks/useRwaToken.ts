@@ -148,6 +148,16 @@ export function useRwaToken() {
     });
   };
 
+  const useTokenDecimals = () => {
+    return useReadContract({
+      ...TOKEN_CONTRACT,
+      functionName: 'decimals',
+      query: {
+        refetchInterval: 5000,
+      },
+    });
+  };
+
   // Write actions
   const mint = useCallback((to: string, amount: bigint) => {
     writeContract({
@@ -251,6 +261,7 @@ export function useRwaToken() {
     usePaused,
     useFrozenAmount,
     useHasRole,
+    useTokenDecimals,
     // Actions
     mint,
     freeze,
