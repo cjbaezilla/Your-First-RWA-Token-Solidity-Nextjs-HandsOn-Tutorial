@@ -1,5 +1,7 @@
 # Your First RWA Token - Complete Hands-On Tutorial
 
+![Cover](./images/screenshot_overview_page.png)
+
 A hands-on tutorial for creating and deploying a Real World Asset (RWA) token on Ethereum Sepolia network using Solidity, Hardhat, OpenZeppelin, and Next.js.
 
 ## Overview
