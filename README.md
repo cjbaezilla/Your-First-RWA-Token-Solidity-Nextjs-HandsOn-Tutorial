@@ -55,6 +55,7 @@ Real World Asset (RWA) tokens represent physical assets on the blockchain. Examp
 
 ### Resources
 
+- [hardhat2 Folder](hardhat2) - Updated Hardhat project structure
 - [OpenZeppelin Contracts](https://openzeppelin.com/contracts/)
 - [Hardhat Documentation](https://hardhat.org/docs)
 - [Next.js Documentation](https://nextjs.org/docs)
