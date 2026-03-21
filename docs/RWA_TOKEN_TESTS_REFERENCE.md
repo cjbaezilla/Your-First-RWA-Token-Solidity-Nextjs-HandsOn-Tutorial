@@ -31,7 +31,7 @@ The test cases comprehensively check the access control integration and standard
 
 ### 5. Restricting (Allowlist)
 - **State Reporting:** Monitors the state behavior of `allowUser` and `disallowUser` interactions made by the designated `LIMITER_ROLE`.
-- **Inherited Contract Behavior Check:** Confirms that checking `isUserAllowed(address)` correctly assesses whether the address state was manually flipped to `true` (Allowed) or stays in its default `false` arrangement. Because the implementation contract consciously omits a `canTransact` overwrite, this section verifies that token transfers naturally sail through, operating solely as an external verification tracking system based on limiting inputs rather than hard-disallowing ERC20 transfers directly on this specific behavior layout.
+- **Inherited Contract Behavior Check:** Confirms that checking `isUserAllowed(address)` correctly assesses whether the address state was manually flipped to `true` (Allowed) or stays in its default `false` arrangement. The implementation contract includes a `canTransact` overwrite that enforces the allowlist; this section verifies that token transfers revert if the sender is not explicitly allowed, ensuring the RWA restriction logic is active.
 
 ### 6. Recovery (Forced Transfer)
 - **Emergency Override:** Vouchsafes the execution capabilities of an administrator holding the elite `RECOVERY_ROLE`.

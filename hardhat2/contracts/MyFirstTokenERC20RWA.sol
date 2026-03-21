@@ -71,6 +71,10 @@ contract MyFirstTokenERC20RWA is ERC20, ERC20Burnable, ERC20Pausable, AccessCont
         super._update(from, to, value);
     }
 
+    function canTransact(address user) public view override returns (bool) {
+        return getRestriction(user) == Restriction.ALLOWED;
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view

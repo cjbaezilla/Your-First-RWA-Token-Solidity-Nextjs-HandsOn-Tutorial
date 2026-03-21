@@ -124,6 +124,9 @@ const Dashboard: NextPage = () => {
             <div className={styles.eventDetails}>
               Frozen Amount: {frozenAmt ? formatUnits(frozenAmt as bigint, 18) : '0'} 1stRWA
             </div>
+            <div className={styles.eventDetails} style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              {!isAllowed ? 'RESTRICTED: You cannot transfer tokens until an admin with LIMITER role approves your address. Contact an admin to be added to the allowlist.' : 'ALLOWED: Your account is approved and can perform token transfers.'}
+            </div>
           </div>
         </div>
 

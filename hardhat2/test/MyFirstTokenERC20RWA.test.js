@@ -76,8 +76,10 @@ describe("MyFirstTokenERC20RWA", function () {
 
   describe("Minting", function () {
     it("Should mint tokens if called by MINTER_ROLE", async function () {
-      const { token, minter, user1 } = await loadFixture(deployTokenFixture);
+      const { token, minter, limiter, user1 } = await loadFixture(deployTokenFixture);
       const mintAmount = ethers.parseUnits("100", 18);
+
+      await token.connect(limiter).allowUser(user1.address);
 
       await expect(token.connect(minter).mint(user1.address, mintAmount))
         .to.emit(token, "Transfer")
@@ -99,14 +101,14 @@ describe("MyFirstTokenERC20RWA", function () {
 
   describe("Pausing", function () {
     it("Should allow PAUSER_ROLE to pause and unpause", async function () {
-      const { token, pauser, minter, user1, user2 } = await loadFixture(deployTokenFixture);
+      const { token, pauser, minter, limiter, user1, user2 } = await loadFixture(deployTokenFixture);
       
       const mintAmount = ethers.parseUnits("100", 18);
+      await token.connect(limiter).allowUser(user1.address);
+      await token.connect(limiter).allowUser(user2.address);
       await token.connect(minter).mint(user1.address, mintAmount);
       
-      // Allow user1 to interact (assuming default might be restricted, let's see. If not, testing pause still works)
-      // Actually wait, if the token is ERC20Restricted, maybe all transfers require allowlist?
-      // Let's assume default allows or we need to allow. We will see in the test execution.
+      // All transfers require users to be allowed.
 
       await expect(token.connect(pauser).pause())
         .to.emit(token, "Paused")
@@ -132,9 +134,9 @@ describe("MyFirstTokenERC20RWA", function () {
       const { token, minter, freezer, limiter, user1, user2 } = await loadFixture(deployTokenFixture);
       const mintAmount = ethers.parseUnits("100", 18);
       
-      await token.connect(minter).mint(user1.address, mintAmount);
       await token.connect(limiter).allowUser(user1.address);
       await token.connect(limiter).allowUser(user2.address);
+      await token.connect(minter).mint(user1.address, mintAmount);
 
       const freezeAmount = ethers.parseUnits("50", 18);
 
@@ -154,39 +156,57 @@ describe("MyFirstTokenERC20RWA", function () {
   });
 
   describe("Restricting (Allowlist)", function () {
-    it("Should correctly report isUserAllowed based on limiter role actions", async function () {
+    it("Should correctly enforce transfers based on limiter role actions", async function () {
       const { token, minter, limiter, user1, user2 } = await loadFixture(deployTokenFixture);
       const mintAmount = ethers.parseUnits("100", 18);
 
+      // We cannot mint to user1 if they are not allowed.
+      // So we test transfer failure by trying to transfer 0 or just check if it reverts without minting (which it should if it's restricted).
+      // Or we allow another user, mint to them, and try to transfer to an unallowed user.
+      
+      // Let's allow minter or another account to have balance.
+      // Actually, let's just allow user1, mint, then disallow to test failure.
+      await token.connect(limiter).allowUser(user1.address);
       await token.connect(minter).mint(user1.address, mintAmount);
+      await token.connect(limiter).disallowUser(user1.address);
 
       // Verify that user1 is not allowed initially
       expect(await token.isUserAllowed(user1.address)).to.be.false;
       expect(await token.isUserAllowed(user2.address)).to.be.false;
 
-      // In this specific contract, canTransact was not overridden, so transfers
-      // always succeed because users are never BLOCKED.
-      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18))).to.not.be.reverted;
+      // In this specific contract, canTransact was overridden, so transfers
+      // now REVERT because users are BLOCKED by default if not ALLOWED.
+      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18)))
+        .to.be.reverted;
 
+      // Allow user1 and user2
       await token.connect(limiter).allowUser(user1.address);
+      await token.connect(limiter).allowUser(user2.address);
       expect(await token.isUserAllowed(user1.address)).to.be.true;
+      expect(await token.isUserAllowed(user2.address)).to.be.true;
 
-      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18))).to.not.be.reverted;
+      // Now transfer should succeed
+      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18)))
+        .to.emit(token, "Transfer")
+        .withArgs(user1.address, user2.address, ethers.parseUnits("10", 18));
       
       // Disallow user1
       await token.connect(limiter).disallowUser(user1.address);
       expect(await token.isUserAllowed(user1.address)).to.be.false;
       
-      // Still succeeds
-      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18))).to.not.be.reverted;
+      // Transfers should revert again
+      await expect(token.connect(user1).transfer(user2.address, ethers.parseUnits("10", 18)))
+        .to.be.reverted;
     });
   });
 
   describe("Recovery (Forced Transfer)", function () {
     it("Should allow RECOVERY_ROLE to transfer tokens regardless of user allowances", async function () {
-      const { token, minter, recoveryAdmin, user1, user2 } = await loadFixture(deployTokenFixture);
+      const { token, minter, limiter, recoveryAdmin, user1, user2 } = await loadFixture(deployTokenFixture);
       const mintAmount = ethers.parseUnits("100", 18);
 
+      await token.connect(limiter).allowUser(user1.address);
+      await token.connect(limiter).allowUser(user2.address);
       await token.connect(minter).mint(user1.address, mintAmount);
 
       // Even if user1 or user2 are paused or restricted, forcedTransfer bypasses allowances.

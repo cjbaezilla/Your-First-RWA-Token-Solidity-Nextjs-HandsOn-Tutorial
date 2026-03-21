@@ -1,6 +1,6 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useAccount } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useAccount, usePublicClient } from 'wagmi';
 import { TOKEN_CONTRACT, MY_FIRST_TOKEN_ABI } from '../contracts/MyFirstTokenERC20RWA';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { decodeEventLog, type Log } from 'viem';
 
 export const ROLES = {
@@ -14,6 +14,7 @@ export const ROLES = {
 
 export function useRwaToken() {
   const { address: userAddress } = useAccount();
+  const publicClient = usePublicClient();
   const { writeContract, data: hash, isPending: isWritePending, error: writeError } = useWriteContract();
   const [events, setEvents] = useState<any[]>([]);
 
@@ -21,9 +22,50 @@ export function useRwaToken() {
     hash,
   });
 
+  // Fetch initial logs
+  useEffect(() => {
+    const fetchInitialLogs = async () => {
+      if (!publicClient || !TOKEN_CONTRACT.address) return;
+
+      try {
+        const currentBlock = await publicClient.getBlockNumber();
+        const fromBlock = currentBlock > BigInt(1000) ? currentBlock - BigInt(1000) : BigInt(0);
+
+        const logs = await publicClient.getLogs({
+          address: TOKEN_CONTRACT.address,
+          fromBlock: fromBlock,
+        });
+
+        const decodedLogs = logs.map(log => {
+          try {
+            const decoded = decodeEventLog({
+              abi: MY_FIRST_TOKEN_ABI,
+              data: log.data,
+              topics: log.topics,
+            });
+            return {
+              ...decoded,
+              transactionHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+            };
+          } catch (e) {
+            return null;
+          }
+        }).filter(Boolean).reverse(); // Reverse so newest is at the top
+
+        setEvents(decodedLogs);
+      } catch (error) {
+        console.error('Error fetching initial logs:', error);
+      }
+    };
+
+    fetchInitialLogs();
+  }, [publicClient]);
+
   // Event Watching - Watch all events by omitting eventName
   useWatchContractEvent({
     ...TOKEN_CONTRACT,
+    pollingInterval: 1_000,
     onLogs(logs: Log[]) {
       const decodedLogs = logs.map(log => {
         try {
