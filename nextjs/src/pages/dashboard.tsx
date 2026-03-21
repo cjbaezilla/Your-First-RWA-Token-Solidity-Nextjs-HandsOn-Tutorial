@@ -23,6 +23,10 @@ const Dashboard: NextPage = () => {
     unpause,
     forcedTransfer,
     transfer,
+    burn,
+    burnFrom,
+    approve,
+    transferFrom,
     events,
     isWritePending,
     isConfirming,
@@ -39,6 +43,18 @@ const Dashboard: NextPage = () => {
   const [forcedFrom, setForcedFrom] = useState('');
   const [forcedTo, setForcedTo] = useState('');
   const [forcedAmount, setForcedAmount] = useState('');
+
+  // New states for added operations
+  const [transferTo, setTransferTo] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [burnAmount, setBurnAmount] = useState('');
+  const [burnFromAddr, setBurnFromAddr] = useState('');
+  const [burnFromAmount, setBurnFromAmount] = useState('');
+  const [approveSpender, setApproveSpender] = useState('');
+  const [approveAmount, setApproveAmount] = useState('');
+  const [tFromFrom, setTFromFrom] = useState('');
+  const [tFromTo, setTFromTo] = useState('');
+  const [tFromAmount, setTFromAmount] = useState('');
 
   // Fetch data
   const { data: balance } = useTokenBalance(userAddress);
@@ -128,10 +144,10 @@ const Dashboard: NextPage = () => {
         )}
 
         {/* Specialized Actions */}
-        {hasMinter && (
+        {(hasMinter || hasAdmin) && (
           <ActionCard 
             title="Mint Tokens"
-            description="Create new tokens and send them to a specific address."
+            description={hasMinter ? "Create new tokens and send them to a specific address." : "ADMIN: Requires MINTER_ROLE but shown for management."}
             inputs={[
               { label: 'Recipient Address', placeholder: '0x...', type: 'text', value: mintTo, onChange: setMintTo },
               { label: 'Amount', placeholder: '0.0', type: 'number', value: mintAmount, onChange: setMintAmount },
@@ -142,10 +158,10 @@ const Dashboard: NextPage = () => {
           />
         )}
 
-        {hasFreezer && (
+        {(hasFreezer || hasAdmin) && (
           <ActionCard 
             title="Freeze Balance"
-            description="Lock a specific amount of tokens in a user's account."
+            description={hasFreezer ? "Lock a specific amount of tokens in a user's account." : "ADMIN: Requires FREEZER_ROLE but shown for management."}
             inputs={[
               { label: 'User Address', placeholder: '0x...', type: 'text', value: freezeUser, onChange: setFreezeUser },
               { label: 'Amount to Freeze', placeholder: '0.0', type: 'number', value: freezeAmount, onChange: setFreezeAmount },
@@ -156,34 +172,102 @@ const Dashboard: NextPage = () => {
           />
         )}
 
-        {hasLimiter && (
+        {(hasLimiter || hasAdmin) && (
           <ActionCard 
             title="Manage Allowlist"
-            description="Control which users are allowed to transact with the token."
+            description={hasLimiter ? "Control which users are allowed to transact with the token." : "ADMIN: Requires LIMITER_ROLE but shown for management."}
             inputs={[
               { label: 'Address', placeholder: '0x...', type: 'text', value: allowAddr, onChange: setAllowAddr },
             ]}
-            buttonText="Allow User"
-            onAction={() => allowUser(allowAddr)}
+            actions={[
+              { text: 'Allow User', onClick: () => allowUser(allowAddr) },
+              { text: 'Disallow User', onClick: () => disallowUser(allowAddr), variant: 'danger' },
+            ]}
             isLoading={isWritePending || isConfirming}
           />
         )}
 
-        {hasRecovery && (
-          <ActionCard 
-            title="Recovery Transfer"
-            description="Forcefully transfer tokens from one account to another (Clawback)."
-            inputs={[
-              { label: 'From Address', placeholder: '0x...', type: 'text', value: forcedFrom, onChange: setForcedFrom },
-              { label: 'To Address', placeholder: '0x...', type: 'text', value: forcedTo, onChange: setForcedTo },
-              { label: 'Amount', placeholder: '0.0', type: 'number', value: forcedAmount, onChange: setForcedAmount },
-            ]}
-            buttonText="Execute Forced Transfer"
-            onAction={() => forcedTransfer(forcedFrom, forcedTo, parseUnits(forcedAmount, 18))}
-            isLoading={isWritePending || isConfirming}
-            style={{ border: '2px solid var(--error)' }}
-          />
-        )}
+        {/* Standard User Actions */}
+        <ActionCard 
+          title="Transfer Tokens"
+          description="Send your tokens to another address."
+          inputs={[
+            { label: 'Recipient', placeholder: '0x...', type: 'text', value: transferTo, onChange: setTransferTo },
+            { label: 'Amount', placeholder: '0.0', type: 'number', value: transferAmount, onChange: setTransferAmount },
+          ]}
+          buttonText="Transfer 1stRWA"
+          onAction={() => transfer(transferTo, parseUnits(transferAmount, 18))}
+          isLoading={isWritePending || isConfirming}
+        />
+
+        <ActionCard 
+          title="Approve Spender"
+          description="Allow another address to spend tokens on your behalf."
+          inputs={[
+            { label: 'Spender Address', placeholder: '0x...', type: 'text', value: approveSpender, onChange: setApproveSpender },
+            { label: 'Amount', placeholder: '0.0', type: 'number', value: approveAmount, onChange: setApproveAmount },
+          ]}
+          buttonText="Approve"
+          onAction={() => approve(approveSpender, parseUnits(approveAmount, 18))}
+          isLoading={isWritePending || isConfirming}
+        />
+
+        <ActionCard 
+          title="Burn Tokens"
+          description="Permanently destroy your own tokens to reduce supply."
+          inputs={[
+            { label: 'Amount to Burn', placeholder: '0.0', type: 'number', value: burnAmount, onChange: setBurnAmount },
+          ]}
+          buttonText="Burn My Tokens"
+          onAction={() => burn(parseUnits(burnAmount, 18))}
+          isLoading={isWritePending || isConfirming}
+          style={{ border: '1px solid var(--error)' }}
+        />
+
+        {/* Advanced/Role-based Actions */}
+        <ActionCard 
+          title="Burn From Address"
+          description="Burn tokens from another account (requires allowance)."
+          inputs={[
+            { label: 'Account', placeholder: '0x...', type: 'text', value: burnFromAddr, onChange: setBurnFromAddr },
+            { label: 'Amount', placeholder: '0.0', type: 'number', value: burnFromAmount, onChange: setBurnFromAmount },
+          ]}
+          buttonText="Burn From"
+          onAction={() => burnFrom(burnFromAddr, parseUnits(burnFromAmount, 18))}
+          isLoading={isWritePending || isConfirming}
+          style={{ border: '1px solid var(--error)' }}
+        />
+
+        <ActionCard 
+          title="Advanced Transfer"
+          description="Transfer tokens between two accounts (requires allowance)."
+          inputs={[
+            { label: 'From Address', placeholder: '0x...', type: 'text', value: tFromFrom, onChange: setTFromFrom },
+            { label: 'To Address', placeholder: '0x...', type: 'text', value: tFromTo, onChange: setTFromTo },
+            { label: 'Amount', placeholder: '0.0', type: 'number', value: tFromAmount, onChange: setTFromAmount },
+          ]}
+          buttonText="Transfer From"
+          onAction={() => transferFrom(tFromFrom, tFromTo, parseUnits(tFromAmount, 18))}
+          isLoading={isWritePending || isConfirming}
+        />
+
+        <ActionCard 
+          title="Recovery Transfer"
+          description={hasRecovery 
+            ? "Forcefully transfer tokens from one account to another (Clawback)."
+            : "Requires RECOVERY_ROLE to forcefully transfer tokens between accounts."
+          }
+          inputs={[
+            { label: 'From Address', placeholder: '0x...', type: 'text', value: forcedFrom, onChange: setForcedFrom },
+            { label: 'To Address', placeholder: '0x...', type: 'text', value: forcedTo, onChange: setForcedTo },
+            { label: 'Amount', placeholder: '0.0', type: 'number', value: forcedAmount, onChange: setForcedAmount },
+          ]}
+          buttonText="Execute Forced Transfer"
+          onAction={() => forcedTransfer(forcedFrom, forcedTo, parseUnits(forcedAmount, 18))}
+          disabled={!(hasRecovery || hasAdmin)}
+          isLoading={isWritePending || isConfirming}
+          style={{ border: '2px solid var(--error)' }}
+        />
 
         {/* Real-time Events feed */}
         <EventLogList events={events} />

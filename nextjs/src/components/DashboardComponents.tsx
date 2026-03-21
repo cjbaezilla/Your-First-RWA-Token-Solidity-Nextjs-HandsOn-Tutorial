@@ -31,6 +31,7 @@ export const ActionCard = ({
   inputs, 
   buttonText, 
   onAction, 
+  actions,
   isLoading, 
   disabled,
   style
@@ -38,8 +39,9 @@ export const ActionCard = ({
   title: string, 
   description: string, 
   inputs: { label: string, placeholder: string, type: string, value: string, onChange: (v: string) => void }[],
-  buttonText: string,
-  onAction: () => void,
+  buttonText?: string,
+  onAction?: () => void,
+  actions?: { text: string, onClick: () => void, style?: React.CSSProperties, variant?: 'primary' | 'danger' }[],
   isLoading?: boolean,
   disabled?: boolean,
   style?: React.CSSProperties
@@ -59,13 +61,34 @@ export const ActionCard = ({
         />
       </div>
     ))}
-    <button 
-      className={styles.button} 
-      onClick={onAction} 
-      disabled={disabled || isLoading}
-    >
-      {isLoading ? 'Processing...' : buttonText}
-    </button>
+    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      {actions ? (
+        actions.map((action, idx) => (
+          <button 
+            key={idx}
+            className={`${styles.button}`} 
+            onClick={action.onClick} 
+            disabled={disabled || isLoading}
+            style={{ 
+              flex: 1, 
+              background: action.variant === 'danger' ? 'var(--error)' : undefined,
+              ...action.style 
+            }}
+          >
+            {isLoading ? 'Processing...' : action.text}
+          </button>
+        ))
+      ) : (
+        <button 
+          className={styles.button} 
+          onClick={onAction} 
+          disabled={disabled || isLoading}
+          style={{ flex: 1 }}
+        >
+          {isLoading ? 'Processing...' : buttonText}
+        </button>
+      )}
+    </div>
   </div>
 );
 

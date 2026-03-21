@@ -169,6 +169,38 @@ export function useRwaToken() {
     });
   }, [writeContract]);
 
+  const burn = useCallback((amount: bigint) => {
+    writeContract({
+      ...TOKEN_CONTRACT,
+      functionName: 'burn',
+      args: [amount],
+    });
+  }, [writeContract]);
+
+  const burnFrom = useCallback((account: string, amount: bigint) => {
+    writeContract({
+      ...TOKEN_CONTRACT,
+      functionName: 'burnFrom',
+      args: [account as `0x${string}`, amount],
+    });
+  }, [writeContract]);
+
+  const approve = useCallback((spender: string, amount: bigint) => {
+    writeContract({
+      ...TOKEN_CONTRACT,
+      functionName: 'approve',
+      args: [spender as `0x${string}`, amount],
+    });
+  }, [writeContract]);
+
+  const transferFrom = useCallback((from: string, to: string, amount: bigint) => {
+    writeContract({
+      ...TOKEN_CONTRACT,
+      functionName: 'transferFrom',
+      args: [from as `0x${string}`, to as `0x${string}`, amount],
+    });
+  }, [writeContract]);
+
   return {
     // Hooks
     useTokenBalance,
@@ -186,6 +218,10 @@ export function useRwaToken() {
     unpause,
     forcedTransfer,
     transfer,
+    burn,
+    burnFrom,
+    approve,
+    transferFrom,
     // State
     events,
     hash,
