@@ -28,13 +28,17 @@ This RWA token implements enterprise-grade features:
 - ✅ **Recovery** - Force transfer capability for legal compliance
 
 ### Role System
- Six distinct roles with specific permissions:
-- `DEFAULT_ADMIN_ROLE` - Full system administration
-- `PAUSER_ROLE` - Control contract pause state
-- `MINTER_ROLE` - Mint new tokens
-- `FREEZER_ROLE` - Freeze/unfreeze token amounts
-- `LIMITER_ROLE` - Manage user restrictions (allowlist)
-- `RECOVERY_ROLE` - Execute forced transfers (clawbacks)
+
+Six distinct roles with specific permissions:
+
+| Role | Role Hash (keccak256) | Permissions |
+|------|----------------------|-------------|
+| `DEFAULT_ADMIN_ROLE` | `0x0000000000000000000000000000000000000000000000000000000000000000` | Full system administration, manages all other roles |
+| `PAUSER_ROLE` | `keccak256("PAUSER_ROLE")` | `pause()`, `unpause()` - Control contract pause state |
+| `MINTER_ROLE` | `keccak256("MINTER_ROLE")` | `mint(address,uint256)` - Create new tokens |
+| `FREEZER_ROLE` | `keccak256("FREEZER_ROLE")` | `freeze(address,uint256)` - Freeze/unfreeze token amounts |
+| `LIMITER_ROLE` | `keccak256("LIMITER_ROLE")` | `allowUser()`, `disallowUser()` - Manage user restrictions |
+| `RECOVERY_ROLE` | `keccak256("RECOVERY_ROLE")` | `forcedTransfer()` - Execute emergency clawbacks |
 
 ## Prerequisites
 
