@@ -174,20 +174,26 @@ const Dashboard: NextPage = () => {
               {isPaused ? '⚠️ Contract is paused' : 'System operational'}
             </p>
           </div>
-             <div className={styles.headerStats}>
-               <div className={styles.headerStat}>
-                 <span className={styles.headerStatValue}>
-                   {formatAmount(supply)} RWA
-                 </span>
-                 <span className={styles.headerStatLabel}>Total Supply</span>
-               </div>
-               <div className={styles.headerStat}>
-                 <span className={styles.headerStatValue}>
-                   {formatAmount(balance)} RWA
-                 </span>
-                 <span className={styles.headerStatLabel}>Your Balance</span>
-               </div>
-             </div>
+              <div className={styles.headerStats}>
+                <div className={styles.headerStat}>
+                  <span className={styles.headerStatValue}>
+                    {formatAmount(supply)} RWA
+                  </span>
+                  <span className={styles.headerStatLabel}>Total Supply</span>
+                </div>
+                <div className={styles.headerStat}>
+                  <span className={styles.headerStatValue}>
+                    {formatAmount(balance)} RWA
+                  </span>
+                  <span className={styles.headerStatLabel}>Your Balance</span>
+                </div>
+                <div className={styles.headerStat}>
+                  <span className={styles.headerStatValue}>
+                    {formatAmount(frozenAmt)} RWA
+                  </span>
+                  <span className={styles.headerStatLabel}>Frozen</span>
+                </div>
+              </div>
         </div>
 
         <div className={styles.contentBody}>
