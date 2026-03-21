@@ -222,58 +222,7 @@ const Dashboard: NextPage = () => {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className={styles.overviewGrid}>
-              <div className={styles.quickStats}>
-                <div className={styles.statCardCompact}>
-                  <div className={styles.statCardIcon}>💰</div>
-                 <div className={styles.statCardContent}>
-                     <div className={styles.statCardValue}>
-                       {formatAmount(balance)} RWA
-                     </div>
-                     <div className={styles.statCardLabel}>Your Balance</div>
-                   </div>
-                </div>
-                 <div className={styles.statCardCompact}>
-                   <div className={styles.statCardIcon}>📈</div>
-                  <div className={styles.statCardContent}>
-                      <div className={styles.statCardValue}>
-                        {formatAmount(supply)} RWA
-                      </div>
-                      <div className={styles.statCardLabel}>Total Supply</div>
-                    </div>
-                 </div>
-               </div>
 
-              <div className={styles.accountStatus}>
-                <div className={styles.statusHeader}>
-                  <h3>Account Status</h3>
-                  <div className={`${styles.statusBadge} ${isAllowed ? styles.statusBadgeAllowed : styles.statusBadgeRestricted}`}>
-                    {isAllowed ? '✓ Allowed' : '⛔ Restricted'}
-                  </div>
-                </div>
-                <div className={styles.statusDetails}>
-                   <div className={styles.statusRow}>
-                     <span>Frozen Amount:</span>
-                     <span className={styles.statusValue}>
-                       {formatAmount(frozenAmt)} RWA
-                     </span>
-                   </div>
-                  <div className={styles.statusMessage}>
-                    {isAllowed 
-                      ? 'Your account is approved and can perform token transfers.'
-                      : 'You cannot transfer tokens until an admin with LIMITER role approves your address.'
-                    }
-                  </div>
-                </div>
-                {canPause && (
-                  <button
-                    className={`${styles.emergencyButton} ${isPaused ? styles.unpauseButton : styles.pauseButton}`}
-                    onClick={() => isPaused ? unpause() : pause()}
-                    disabled={isWritePending || isConfirming}
-                  >
-                    {isPaused ? '▶️ Resume Operations' : '⏸️ Emergency Pause'}
-                  </button>
-                )}
-              </div>
 
               <div className={styles.rolesPanel}>
                 <h3>Your Roles</h3>
