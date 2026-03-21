@@ -8,7 +8,7 @@ A production-ready Real World Asset (RWA) token built on Ethereum using OpenZepp
 - **Symbol:** 1stRWA
 - **Standard:** ERC20 with multiple extensions
 - **Network:** Sepolia (Testnet)
-- **Token Address:** [`0x4AA130C5deBA46C3b1CBd63372567eda2D506aB4`](https://sepolia.etherscan.io/address/0x4AA130C5deBA46C3b1CBd63372567eda2D506aB4)
+- **Token Address:** [`0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D`](https://sepolia.etherscan.io/address/0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D)
 
 ## Features
 
@@ -189,11 +189,11 @@ npx hardhat test test/MyFirstTokenERC20RWA.test.js
 
 The contract has been deployed to Sepolia testnet:
 
-**Contract Address:** [`0x4AA130C5deBA46C3b1CBd63372567eda2D506aB4`](https://sepolia.etherscan.io/address/0x4AA130C5deBA46C3b1CBd63372567eda2D506aB4)
+**Contract Address:** [`0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D`](https://sepolia.etherscan.io/address/0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D)
 
-**Deployment Transaction:** [`0xc8a5fa41e1f8a5b257fd96457dd1efc530c50b5aa5c252633c2b7e0496139906`](https://sepolia.etherscan.io/tx/0xc8a5fa41e1f8a5b257fd96457dd1efc530c50b5aa5c252633c2b7e0496139906)
+**Deployment Transaction:** [`0x925291f1ad358abeed92b694b783ab56eeaa55ed4f7df9e4c5688011ced1e2a1b696772`](https://sepolia.etherscan.io/tx/0x925291f1ad358abeed92b694b783ab56eeaa55ed4f7df9e4c5688011ced1e2a1b696772)
 
-View on Etherscan: https://sepolia.etherscan.io/address/0x4AA130C5deBA46C3b1CBd63372567eda2D506aB4
+View on Etherscan: https://sepolia.etherscan.io/address/0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D
 
 ## Security Considerations
 

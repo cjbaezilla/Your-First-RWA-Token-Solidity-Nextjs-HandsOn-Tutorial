@@ -818,7 +818,7 @@ export const MY_FIRST_TOKEN_ABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "account",
+        "name": "user",
         "type": "address"
       }
     ],
