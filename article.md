@@ -1,4 +1,8 @@
-# Understanding MyFirstTokenERC20RWA
+# The Beginner's Hands-On Guide to RWA Tokens on Ethereum: Solidity, Hardhat, OpenZeppelin, and Next.js Dashboard
+
+![Cover](./images/screenshot_overview_page.png)
+
+# Introduction
 
 Welcome to a hands-on guide that will help you build your first Real World Asset token from the ground up. I will walk you through every concept and piece of code, assuming you have no prior experience with blockchain technology or cryptocurrency. My goal is to transform complex ideas into clear understanding, so you can confidently create tokens that comply with real-world regulatory requirements.
 
@@ -6,23 +10,9 @@ This tutorial is built on a simple but powerful premise: you learn by doing. You
 
 The project provides a complete, ready-to-fork solution. The smart contract combines several OpenZeppelin extensions to deliver features that traditional tokens lack. You will discover how the freezing mechanism immobilizes suspicious accounts while leaving legitimate holdings accessible, how the restriction system creates an allowlist for verified investors, and how role-based access control distributes authority across multiple administrators. The accompanying Next.js dashboard demonstrates how these contract features translate into a usable web interface where users can mint tokens, transfer them, and monitor activity in real-time.
 
-I want to be clear about what you will achieve. You will learn how to deploy a token on the Ethereum Sepolia testnet, a safe environment that mimics the real blockchain without financial risk. You will configure environment variables, connect a wallet, and interact with the live contract. You will understand the distinction between public functions anyone can call and privileged functions that require specific roles. You will see how events create an immutable audit trail that regulators can inspect. You will grasp how the permit system saves gas by allowing off-chain approvals. You will understand why the token is paused using the Pausable extension and how the recovery function rescues tokens from mistakes.
-
-The regulatory framework emerges from careful design choices. The allowlist system ensures only approved participants can receive tokens, satisfying know-your-customer requirements. The minting restriction guarantees that new tokens appear only when authorized, maintaining the link between token supply and real asset backing. The freezing capability provides a response mechanism for legal orders or investigations. The pause function acts as an emergency stop when vulnerabilities are discovered. The recovery role offers a safety net for human error. Together these features create a governance structure that mirrors traditional finance but operates on-chain.
-
 This is not theoretical. The code you will study is production-grade, inheriting from OpenZeppelin's audited libraries. The frontend uses Wagmi and RainbowKit for secure wallet interactions. Every line has a purpose. I will show you the constructor where roles get assigned, the overrides that chain multiple security checks, the events that broadcast important state changes, and the modifiers that guard privileged functions. You will learn how the _update function serves as a central gatekeeper, running checks from all parent contracts before any balance changes.
 
-The learning journey proceeds in stages. First you will understand the big picture: what an RWA token represents and how it flows from physical asset to digital ownership. Then you will prepare your environment: install dependencies, acquire testnet ETH from a faucet, and set up your wallet. Next you will deploy the contract and observe which addresses hold administrative powers. After that you will explore the contract code itself, starting with Solidity fundamentals and moving through each extension in detail. Finally you will use the dashboard to execute transactions, trigger events, and see how the system responds.
-
-My approach balances depth with accessibility. When I introduce Solidity concepts, I relate them to programming languages you might already know. When I explain mapping structures, I show you how they act like dictionaries that live on the blockchain. When I discuss gas costs, I clarify why some functions are free while others require payment. When I cover role management, I illustrate how distributed control prevents any single point of failure. You will encounter tables that summarize key terms, role responsibilities, and restriction states. These tables condense information into scannable formats without resorting to lists.
-
-What makes this tutorial particularly valuable is that you are working with a complete system, not isolated snippets. The token contract, the frontend application, and the deployment scripts form an integrated whole. You can modify any part and see the effects immediately. You can add new roles, change restriction logic, or extend the UI. The code is yours to experiment with, and understanding comes from that experimentation.
-
 I have written this with absolute beginners in mind. If you have never heard of Ethereum, if you don't know what a wallet is, if terms like "minting" and "burning" sound unfamiliar, this guide is for you. I define every term when it first appears. I use analogies that connect to everyday experiences. I avoid jargon unless I immediately explain it. When I reference concepts like keccak256 hashes or custom errors, I provide context so you understand their purpose.
-
-Now let us begin. Take a deep breath and trust the process. You are about to unlock a skill that sits at the intersection of finance, technology, and law. This knowledge will serve you whether you become a developer building tokenization platforms, a compliance officer evaluating protocols, or an entrepreneur launching new financial products. The RWA space is growing rapidly, and understanding its technical foundations positions you to participate meaningfully.
-
-Ready to start? Open your terminal, look at the project structure, and let's take the first step together.
 
 ## Quick Start: The Big Picture
 
@@ -1614,7 +1604,7 @@ The contract does not include a mechanism to adjust roles after deployment excep
 
 ## How These Two Contracts Work Together: The Complete Security Pipeline
 
-When I examine MyFirstTokenERC20RWA, I see a contract that inherits from multiple extension contracts. Two of these extensions—ERC20Freezable and ERC20Restricted—each implement their own `_update` override. But the main contract also overrides `_update` itself to coordinate all the parent checks. This creates a layered security pipeline where every token transfer passes through multiple validation stages.
+When I examine MyFirstTokenERC20RWA, I see a contract that inherits from multiple extension contracts. Two of these extensions "ERC20Freezable and ERC20Restricted" each implement their own `_update` override. But the main contract also overrides `_update` itself to coordinate all the parent checks. This creates a layered security pipeline where every token transfer passes through multiple validation stages.
 
 This orchestration is the heart of what makes this token suitable for regulated real world assets. The contract isn't just a simple token; it's a security-checking gateway that ensures every movement of tokens complies with freezing rules, restriction rules, and pause states before any balances actually change.
 
@@ -1626,7 +1616,7 @@ Let me first understand what each extension does:
 
 **ERC20Restricted** adds account restrictions with three states: DEFAULT, BLOCKED, and ALLOWED. MyFirstTokenERC20RWA overrides its `canTransact` function to implement an allowlist: only ALLOWED accounts can send or receive tokens. The restricted extension checks both the sender and recipient on every transfer to ensure both are allowed.
 
-Both extensions do this by overriding the internal `_update` function. That's the function that gets called whenever token balances change—whether through normal transfers, minting, or burning.
+Both extensions do this by overriding the internal `_update` function. That's the function that gets called whenever token balances change, whether through normal transfers, minting, or burning.
 
 ### The Main Contract's Override Coordination
 

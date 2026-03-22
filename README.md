@@ -1,4 +1,4 @@
-# Your First RWA Token - Complete Hands-On Tutorial
+# # The Beginner's Hands-On Guide to RWA Tokens on Ethereum: Solidity, Hardhat, OpenZeppelin, and Next.js Dashboard
 
 ![Cover](./images/screenshot_overview_page.png)
 
