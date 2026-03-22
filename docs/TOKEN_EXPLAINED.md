@@ -330,6 +330,10 @@ The contract inherits from ERC20 and implements the IERC7943Fungible interface t
 
 ERC20Restricted implements account restrictions. This contract lets me control who can receive and send tokens. It introduces three restriction levels that determine an account's interaction abilities.
 
+This is one of the most important features of this token. It implements what I call a trusted participant system. The token can only move between addresses I have explicitly approved. This isn't about exclusion. It's about creating a safe regulated environment where every participant has been verified. When I use this token I know I'm transacting only with other approved investors. That peace of mind is essential for real world assets.
+
+The contract that makes this possible is ERC20Restricted. It gives me the tools to decide who can send and receive tokens. The system revolves around something called a restriction state. Every address in the token ecosystem has one of three possible states. I can show you how these states work together.
+
 ### The Restriction Enum
 
 The heart of this contract is the Restriction enum on lines 16 through 20.
@@ -345,6 +349,12 @@ enum Restriction {
 Enums in Solidity are user-defined types with named values. This enum has three states. DEFAULT means the account has no special restriction applied. BLOCKED means the account cannot send or receive tokens. ALLOWED means the account is explicitly permitted even if other logic might block them.
 
 I like that the default is DEFAULT. This means new accounts start with no restriction. Restrictions must be actively applied. This is important because it means I do not need to maintain an allowlist by default. I can block specific bad actors without affecting everyone else.
+
+| Restriction State | What This Means For You | Can You Send Tokens? | Can You Receive Tokens? |
+|-------------------|------------------------|----------------------|-------------------------|
+| DEFAULT | I have not reviewed this address yet | No | No |
+| BLOCKED | This address has been blocked | No | No |
+| ALLOWED | This address has been verified and approved | Yes | Yes |
 
 ### The Restrictions Mapping
 
@@ -393,6 +403,20 @@ This is the central gatekeeper function. By default it returns true for DEFAULT 
 The comment shows that I can override this function to implement an allowlist instead. In MyFirstTokenERC20RWA, the contract overrides canTransact to require Restriction.ALLOWED. That turns the system into an allowlist. Only accounts explicitly granted ALLOWED status can transact. This is crucial for regulated RWA tokens where only verified investors can participate.
 
 I appreciate the virtual keyword on this function. It means child contracts can change the logic. This makes the contract flexible. The base provides a sensible default (blocklist) but I can customize it for stricter requirements (allowlist).
+
+What happens when someone tries to transfer tokens? The contract checks canTransact for both the sender and the recipient. If either one returns false, the transaction fails immediately. The user sees a clear error message telling them their account is restricted. This protects everyone from accidentally interacting with unverified accounts.
+
+I manage who gets ALLOWED status through two simple functions. The allowUser function grants access. The disallowUser function removes access. These functions are protected by the LIMITER_ROLE, meaning only designated administrators can modify the allowlist.
+
+```solidity
+function allowUser(address user) public onlyRole(LIMITER_ROLE) {
+    _allowUser(user);
+}
+
+function disallowUser(address user) public onlyRole(LIMITER_ROLE) {
+    _resetUser(user);
+}
+```
 
 ### The _update Enforcement
 
