@@ -4,7 +4,7 @@
 
 A hands-on tutorial for creating and deploying a Real World Asset (RWA) token on Ethereum Sepolia network using Solidity, Hardhat, OpenZeppelin, and Next.js.
 
-![mermaid](../images/mermaid.png)
+![mermaid](./images/mermaid.png)
 
 ## Overview
 
