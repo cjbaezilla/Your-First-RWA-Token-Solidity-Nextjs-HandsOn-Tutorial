@@ -1334,9 +1334,46 @@ function forcedTransfer(address from, address to, uint256 amount) public onlyRol
 }
 ```
 
-## The Internal Override Functions
+## The Internal Override Functions: Understanding the Security Chain
 
-Lines 67 through 76 contain override functions. These are required because we are inheriting from multiple contracts that all define the same internal functions. The Solidity compiler needs us to explicitly specify which parent implementation we want to use in our override chain.
+One of the most sophisticated aspects of this token contract is how it handles multiple inheritance. The contract inherits from seven different parent contracts. Many of these parents define the same internal functions. The Solidity compiler needs explicit instructions on which parent's implementation to call and in what order. This is where override functions come in. They create a chain of security checks that run every time tokens move.
+
+I want to emphasize that this is not just academic code architecture. The override chain determines exactly what happens when someone tries to transfer tokens. It's the security pipeline where freezing checks, restriction checks, and pause checks all happen in sequence. Understanding this chain helps me see how the contract enforces its rules.
+
+### Internal vs Public vs External: Function Visibility
+
+Before diving into overrides, I need to be clear about function visibility. Solidity has four visibility levels:
+
+- `public`: Anyone can call this function from inside or outside the contract
+- `external`: Only external calls can invoke this (not from within the same contract)
+- `internal`: Only this contract and contracts that inherit from it can call
+- `private`: Only this exact contract can call, not even children can access
+
+The `_update` function is `internal`. That's significant. It means external users cannot call `_update` directly. They must call public functions like `transfer` or `transferFrom`, which then internally call `_update`.
+
+Why is it internal? Because `_update` is the central gatekeeper. It's not meant to be called directly by users. It's called by other functions that handle the transaction logic. Making it internal ensures the security checks are always enforced and cannot be bypassed.
+
+### What Does "Override" Mean in Solidity?
+
+When a child contract inherits from a parent, it automatically gets all the parent's functions. If the child wants to change the behavior of a parent function, it can override that function. The parent function must be marked `virtual` to allow overriding.
+
+```solidity
+// In a parent contract
+function _update(address from, address to, uint256 value) internal virtual {
+    // Parent implementation
+}
+
+// In the child contract
+function _update(address from, address to, uint256 value) internal override {
+    // Child implementation, possibly calling super._update(...)
+}
+```
+
+The `override` keyword tells the compiler: "I know there's a virtual function with this name in a parent contract, and I'm intentionally overriding it."
+
+### Why Multiple Override Listings?
+
+Look at the override declaration:
 
 ```solidity
 function _update(address from, address to, uint256 value)
@@ -1346,6 +1383,203 @@ function _update(address from, address to, uint256 value)
     super._update(from, to, value);
 }
 ```
+
+The `override(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted)` part lists which parent contracts' virtual functions are being overridden. Why list all four? Because Solidity requires explicit specification when multiple parent contracts define functions with the same name. This prevents ambiguity and ensures the developer consciously understands the inheritance hierarchy.
+
+If I only wrote `override` without the list, the compiler would try to infer which parent function I'm overriding. With multiple inheritance, it cannot infer safely. The explicit list is both a requirement and good documentation.
+
+### The `super._update()` Call: Method Resolution Order
+
+What happens when `super._update(from, to, value)` is called? Solidity uses a specific order to determine which parent's implementation runs next. This order is called the C3 linearization (or method resolution order).
+
+The inheritance declaration for MyFirstTokenERC20RWA looks like:
+
+```solidity
+contract MyFirstTokenERC20RWA is
+    ERC20,
+    ERC20Permit,
+    ERC20Burnable,
+    ERC20Pausable,
+    ERC20Freezable,
+    ERC20Restricted,
+    AccessControl
+```
+
+When `super._update()` is called, Solidity walks the inheritance hierarchy to find the next `_update` implementation. It starts with the child contract (which just executed), then looks at the next contract in the linearization order that has an `_update` function.
+
+The linearization of this contract's ancestors is roughly: 
+ERC20 -> ERC20Pausable -> ERC20Freezable -> ERC20Restricted -> AccessControl -> ... (other base contracts)
+
+But which `_update` implementations actually exist? Each of these parent contracts defines its own `_update` override:
+
+- **ERC20** defines the base `_update` that actually updates balances and emits the Transfer event. This is the fundamental implementation.
+- **ERC20Pausable** overrides `_update` to check if the contract is paused before continuing.
+- **ERC20Freezable** overrides `_update` to check that the sender has enough unfrozen balance.
+- **ERC20Restricted** overrides `_update` to check that both sender and recipient are allowed to transact.
+
+When MyFirstTokenERC20RWA's `_update` calls `super._update()`, it goes to the next implementation in the linearization chain among those listed in the override specification. The chain is:
+
+1. MyFirstTokenERC20RWA `_update` (the one shown above) - calls super
+2. ERC20Pausable `_update` - checks pause, then calls super
+3. ERC20Freezable `_update` - checks freeze, then calls super
+4. ERC20Restricted `_update` - checks restrictions, then calls super
+5. ERC20 `_update` - the base that actually updates balances
+
+Each parent's `_update` runs before the next one. If any parent's check fails and reverts, the entire transaction fails and no balance changes occur. This ensures all security conditions are satisfied.
+
+Let me trace through what happens with a concrete example. Suppose Alice (an allowed user with available balance) tries to send 100 tokens to Bob (also allowed).
+
+**Step 1**: Alice calls `transfer(Bob, 100)` in her wallet.
+
+**Step 2**: The ERC20 `transfer` function (inherited from parent ERC20) executes. It validates the amount and then calls `_update(Alice, Bob, 100)`.
+
+**Step 3**: MyFirstTokenERC20RWA's `_update` runs. It does nothing except `super._update(Alice, Bob, 100)` because this contract doesn't add its own checks.
+
+**Step 4**: ERC20Pausable's `_update` runs. It checks `_isPaused()`. If the token is paused, it reverts with a paused error. Since we're not paused, it continues by calling `super._update(Alice, Bob, 100)`.
+
+**Step 5**: ERC20Freezable's `_update` runs. It gets Alice's available balance: `available(Alice) = totalBalance(Alice) - frozenBalance(Alice)`. If that available balance is less than 100, it reverts with `ERC20InsufficientUnfrozenBalance`. Since Alice has enough available, it continues by calling `super._update(Alice, Bob, 100)`.
+
+**Step 6**: ERC20Restricted's `_update` runs. It calls `_checkRestriction(Alice)` and `_checkRestriction(Bob)`. Each check does `require(getRestriction(account) == Restriction.ALLOWED)`. If either account is not ALLOWED, it reverts with `ERC20UserRestricted`. Since both are allowed, it continues by calling `super._update(Alice, Bob, 100)`.
+
+**Step 7**: The base ERC20's `_update` runs. This is where the actual balance changes happen:
+```solidity
+_balances[Alice] -= 100;
+_balances[Bob] += 100;
+emit Transfer(Alice, Bob, 100);
+```
+
+If Alice had insufficient total balance (not just available), ERC20 itself would revert with an insufficient balance error before the balances even change.
+
+### Visualizing the Call Stack
+
+Here's what the execution flow looks like:
+
+```
+transfer() from wallet
+    |
+    v
+[ERC20.transfer] - checks amount, calls _update
+    |
+    v
+[MyFirstTokenERC20RWA._update] - override chain starts
+    |
+    v
+[ERC20Pausable._update] - check: is paused?
+    |
+    v
+[ERC20Freezable._update] - check: does sender have available balance?
+    |
+    v
+[ERC20Restricted._update] - check: are sender and recipient allowed?
+    |
+    v
+[ERC20._update] - perform balance updates + emit Transfer event
+    |
+    v
+Return success to wallet
+```
+
+Every transfer goes through this entire chain. The order matters. If I reversed the order, different behaviors could emerge. For instance, if the restriction check ran before the freeze check, a restricted user trying to transfer would fail earlier in the chain, but the outcome is the same regardless of order because all checks must pass.
+
+### Why Not Put All Checks in One Function?
+
+I might wonder why this is so complicated. Why not just write one big `_update` function that checks everything? The answer is separation of concerns and modularity.
+
+Each parent contract is self-contained. ERC20Pausable knows only about pausing. ERC20Freezable knows only about freezing. ERC20Restricted knows only about restrictions. They can be developed, tested, and used independently. I can use ERC20Pausable in a token that has no freezing or restriction features. I can use ERC20Freezable in a token that isn't pausable.
+
+By having each contract override `_update` and call `super._update`, they can each inject their check into the pipeline without knowing about each other. This is the elegance of inheritance-based composition.
+
+If I tried to combine all checks into a single monolithic function, I'd lose the ability to mix and match features. I'd also make the code harder to understand and test. The inheritance pattern keeps concerns separated while still producing a unified token contract.
+
+### The Other Override Functions
+
+The MyFirstTokenERC20RWA contract also overrides `canTransact`:
+
+```solidity
+function canTransact(address user) public view override returns (bool) {
+    return getRestriction(user) == Restriction.ALLOWED;
+}
+```
+
+This override changes the behavior inherited from ERC20Restricted. The base ERC20Restricted's `canTransact` returns `true` for both DEFAULT and ALLOWED accounts (i.e., it's a blocklist: only BLOCKED accounts can't transact). MyFirstTokenERC20RWA overrides to return `true` only for ALLOWED accounts. This converts the system from a blocklist to an allowlist, which is what regulated RWA tokens need.
+
+Notice the override specification: `override` without a parent list. Why can I omit the list here? Because only one parent contract (ERC20Restricted) defines a virtual `canTransact` function. There's no ambiguity, so the compiler doesn't need explicit listing.
+
+The `supportsInterface` override:
+
+```solidity
+function supportsInterface(bytes4 interfaceId)
+    public
+    view
+    override(AccessControl, ERC1363)
+    returns (bool)
+{
+    return super.supportsInterface(interfaceId);
+}
+```
+
+This function responds to queries about which interfaces the contract supports. ERC165 standard defines this. Both AccessControl and ERC1363 implement their own `supportsInterface` because they each support different interface IDs. The override list `(AccessControl, ERC1363)` indicates which parent implementations need to be combined. The `super.supportsInterface` call goes through the linearization chain to check each parent's supported interfaces.
+
+### Override Chain Rules and Common Errors
+
+Solidity has specific rules for overriding:
+
+1. All functions in the override chain must have the same signature (name, parameters, mutability, visibility)
+2. The child's function must be marked `override`
+3. The child's function can be more visible than the parent (e.g., override a `internal` with `public`) but not less visible
+4. The child's function can be more restrictive in state mutability (e.g., override a `nonpayable` with `view`) but not less restrictive
+
+Common errors include:
+
+- **"Function cannot override because it is not marked as virtual in the base contract"** - The parent function must have the `virtual` keyword. OpenZeppelin contracts mark all appropriate functions as virtual.
+
+- **"Explicit override list specifies duplicated contracts"** - You listed the same contract twice in the override specification. Check your inheritance hierarchy for duplicate base contracts.
+
+- **"No base class contains function with name X with specified parameter types"** - The function signature doesn't match any parent virtual function. Check the parameter types or the function name.
+
+- **"Different number of override specifiers"** - Some parent contracts define the function, others don't. You need to list all parents that define it, or list none if only one parent defines it.
+
+### Testing Override Behavior
+
+When testing, I should verify that all the checks in the override chain actually run. For example, if I pause the token and then try to transfer, I should get a "paused" error, not an insufficient balance error. That tells me the pause check happened before balance checks.
+
+Similarly, if I freeze Alice's tokens and she tries to transfer more than her available balance, she should get the insufficient unfrozen balance error. If I restrict Bob from receiving and Alice tries to send to Bob, she should get the user restricted error.
+
+The order of checks in the override chain affects which error appears first when multiple conditions are violated. ERC20Pausable's check runs first in this implementation, so if the token is paused, that error appears before any other checks. This is good design: the pause is a global condition that short-circuits all other logic.
+
+### Customizing the Override Chain
+
+I can customize the behavior by overriding `_update` with different logic or a different call to `super._update`. For instance, I could implement my own custom restriction that involves off-chain verification by calling an oracle. The pattern would be:
+
+```solidity
+function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted) {
+    // Custom check before parent checks
+    require(myOffchainVerification(from, to), "Offchain check failed");
+    
+    // Run all parent checks
+    super._update(from, to, value);
+    
+    // Or run parent checks first, then custom after
+    // super._update(from, to, value);
+    // emit MyCustomEvent(...);
+}
+```
+
+I must be careful not to skip `super._update` or the token would break. The parent `_update` implementations collectively perform the essential security checks.
+
+### Reentrancy Considerations
+
+A subtle but important point: the `_update` function is called from various places, including `transfer`, `transferFrom`, `_mint`, and `_burn`. The parent implementations ensure that the checks are consistently applied regardless of how tokens move.
+
+This is important for reentrancy safety. Since `_update` is called after balance modifications but before event emission, and since the checks happen before balance changes, a reentrant call cannot bypass the restrictions. The entire call chain is atomic: either all checks pass and balances update, or the transaction reverts completely.
+
+### Debugging Override Chains
+
+If a transfer isn't behaving as expected, I need to understand which check is failing. The custom error messages help: paused error, insufficient unfrozen balance error, user restricted error, insufficient balance error. These map directly to which parent's `_update` implementation rejected the transaction.
+
+I can also add event emissions in custom overrides to trace execution. But I should not add events in production override functions because that would cost extra gas on every transfer. The parent contracts don't emit extra events in `_update`; they only emit events on state changes (pause, unpause, freeze, restriction changes, Transfer). This keeps transfer gas costs as low as possible while maintaining security.
+
+The override mechanism is a sophisticated pattern that enables modular security composition. By understanding it deeply, I can confidently extend the token with additional features while maintaining the security guarantees that regulated assets require.
 
 The _update function is called whenever tokens move from one account to another. By overriding it and calling super._update we ensure that all the parent contract checks run in sequence. The pausable parent checks if transfers are paused. The freezable parent checks if the sender has frozen tokens. The restricted parent checks if the recipient is allowed to receive tokens. These checks happen automatically every time someone tries to transfer tokens.
 
@@ -1378,46 +1612,522 @@ Each feature has a corresponding role that controls access. No single person has
 
 The contract does not include a mechanism to adjust roles after deployment except through the DEFAULT_ADMIN_ROLE using the AccessControl functions. This means the admin can reassign responsibilities as team members change.
 
-## How These Two Contracts Work Together
+## How These Two Contracts Work Together: The Complete Security Pipeline
 
-In MyFirstTokenERC20RWA both contracts are inherited and both override _update. The MyFirstTokenERC20RWA contract also overrides _update to call super._update with all the parents specified.
+When I examine MyFirstTokenERC20RWA, I see a contract that inherits from multiple extension contracts. Two of these extensions—ERC20Freezable and ERC20Restricted—each implement their own `_update` override. But the main contract also overrides `_update` itself to coordinate all the parent checks. This creates a layered security pipeline where every token transfer passes through multiple validation stages.
+
+This orchestration is the heart of what makes this token suitable for regulated real world assets. The contract isn't just a simple token; it's a security-checking gateway that ensures every movement of tokens complies with freezing rules, restriction rules, and pause states before any balances actually change.
+
+### The Two Key Extension Contracts
+
+Let me first understand what each extension does:
+
+**ERC20Freezable** adds the ability to freeze tokens in specific accounts. When tokens are frozen, they remain in the account but cannot be moved. The freezable extension tracks frozen balances separately from total balances. It calculates available balance as `totalBalance - frozenBalance`. During any transfer from an account, it checks that the transfer amount doesn't exceed the available (unfrozen) balance.
+
+**ERC20Restricted** adds account restrictions with three states: DEFAULT, BLOCKED, and ALLOWED. MyFirstTokenERC20RWA overrides its `canTransact` function to implement an allowlist: only ALLOWED accounts can send or receive tokens. The restricted extension checks both the sender and recipient on every transfer to ensure both are allowed.
+
+Both extensions do this by overriding the internal `_update` function. That's the function that gets called whenever token balances change—whether through normal transfers, minting, or burning.
+
+### The Main Contract's Override Coordination
+
+MyFirstTokenERC20RWA looks like this:
 
 ```solidity
-function _update(address from, address to, uint256 value)
-    internal
-    override(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted)
+contract MyFirstTokenERC20RWA is
+    ERC20,
+    ERC20Permit,
+    ERC20Burnable,
+    ERC20Pausable,
+    ERC20Freezable,
+    ERC20Restricted,
+    AccessControl
 {
+    // ... role constants and constructor ...
+
+    function _update(address from, address to, uint256 value)
+        internal
+        override(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted)
+    {
+        super._update(from, to, value);
+    }
+
+    function canTransact(address user) public view override returns (bool) {
+        return getRestriction(user) == Restriction.ALLOWED;
+    }
+
+    // ... other functions ...
+}
+```
+
+The `_update` override lists four parent contracts: ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted. This tells the compiler: "I'm overriding the `_update` function from all these parents, and I want to specify the order in which their implementations run."
+
+The implementation simply calls `super._update(from, to, value)`. That single line triggers the entire inheritance chain.
+
+### Step by Step: What Happens During a Transfer
+
+Let me trace a complete transfer with specific addresses and amounts to understand the full flow.
+
+**Scenario**: Alice has 500 tokens, of which 100 are frozen. Bob has 200 tokens. Both Alice and Bob are in ALLOWED restriction state. The token is not paused. Alice tries to send 250 tokens to Bob. Charlie is BLOCKED.
+
+**Step 1: User Initiates Transfer**
+
+Alice connects her wallet (MetaMask) to the dashboard and enters: transfer 250 tokens to Bob's address (0xBob...). She confirms the transaction in MetaMask, which broadcasts it to the Sepolia network.
+
+**Step 2: Transaction Reaches the Contract**
+
+The transaction arrives at the MyFirstTokenERC20RWA contract address. The transaction data specifies the `transfer` function with parameters `(to: 0xBob..., amount: 250)`.
+
+The Ethereum Virtual Machine executes the contract code.
+
+**Step 3: ERC20.transfer() Entry Point**
+
+The `transfer` function is defined in the ERC20 parent contract. It performs some initial checks:
+
+```solidity
+function transfer(address to, uint256 amount) public virtual returns (bool) {
+    address owner = msg.sender;
+    require(to != owner, "ERC20: transfer to the same address");
+    require(balanceOf(owner) >= amount, "ERC20: insufficient balance");
+    // ... more checks possibly ...
+    _beforeTokenTransfer(owner, to, amount);
+    _update(owner, to, amount);
+    _afterTokenTransfer(owner, to, amount);
+    return true;
+}
+```
+
+First it checks `balanceOf(owner)` - Alice's total balance. Alice's total balance is 500, so this passes (250 <= 500). It also checks that she's not transferring to herself. Then it calls `_update(owner, to, amount)`.
+
+**Step 4: MyFirstTokenERC20RWA._update()**
+
+Control flows into the `_update` override in MyFirstTokenERC20RWA. This function currently does nothing except call `super._update`. So it immediately calls `super._update(Alice, Bob, 250)`.
+
+**Step 5: ERC20Pausable._update()**
+
+The first parent in the override chain is ERC20Pausable. Its `_update` looks like:
+
+```solidity
+function _update(address from, address to, uint256 value) internal virtual override {
+    require(!_isPaused(), "ERC20Pausable: transfer paused");
     super._update(from, to, value);
 }
 ```
 
-This creates a chain. When a transfer happens, this _update calls super._update which goes through each parent's _update in order. ERC20Pausable checks if transfers are paused. ERC20Freezable checks if the sender has enough available balance. ERC20Restricted checks if both sender and recipient are allowed. Finally the base ERC20 updates the balances.
+It checks `_isPaused()`. If the token is paused, it reverts with the error "ERC20Pausable: transfer paused". In our scenario, the token is not paused, so this check passes and it calls `super._update(Alice, Bob, 250)`.
 
-All these checks must pass for a transfer to succeed. This layered security model gives me fine-grained control over token movements. I can pause the entire system, freeze specific accounts, and restrict who can hold the token. That is exactly what a regulated asset needs.
+**Step 6: ERC20Freezable._update()**
 
-### Error Messages Guide Users
+Next is ERC20Freezable. Its `_update` implementation:
 
-Each contract defines custom errors that provide clear reasons for failures. ERC20Freezable defines ERC20InsufficientUnfrozenBalance. ERC20Restricted defines ERC20UserRestricted. These errors appear in transaction revert messages. Users and developers can read these to understand why their transaction failed. Was it a freeze? A restriction? A pause? The error tells them.
+```solidity
+function _update(address from, address to, uint256 value) internal virtual override {
+    if (from != address(0)) {
+        uint256 unfrozen = available(from);
+        require(unfrozen >= value, "ERC20InsufficientUnfrozenBalance");
+    }
+    super._update(from, to, value);
+}
+```
 
-### Storage Layout Considerations
+Because `from` is Alice (not address(0)), it checks the available balance. It calls `available(Alice)`, which returns `balanceOf(Alice) - frozenBalances[Alice] = 500 - 100 = 400`. The check verifies that 400 >= 250, which is true. So this passes and it calls `super._update(Alice, Bob, 250)`.
 
-Both contracts store their own mappings. ERC20Freezable has _frozenBalances. ERC20Restricted has _restrictions. These occupy separate storage slots. The Solidity compiler automatically calculates storage positions to avoid collisions between parent contracts. This means I can safely inherit both without worrying about them overwriting each other's data.
+**Step 7: ERC20Restricted._update()**
 
-### Gas Costs
+Now we reach ERC20Restricted. Its `_update`:
 
-Every additional check adds gas cost to transfers. The freeze check requires reading the frozen balance and doing a subtraction. The restriction check requires two lookups (for from and to) and a comparison. This overhead is minimal but measurable. For a regulated token this is an acceptable cost because the benefits far outweigh the few extra gas units per transfer.
+```solidity
+function _update(address from, address to, uint256 value) internal virtual override {
+    if (from != address(0)) _checkRestriction(from);
+    if (to != address(0)) _checkRestriction(to);
+    super._update(from, to, value);
+}
+```
 
-### Extensibility Through Virtual Functions
+It checks both sender and recipient (unless they're address(0) for mint/burn). The `_checkRestriction` function does:
 
-All the key functions are marked virtual. This allows my main contract to customize behavior. For canTransact I override to require ALLOWED instead of the default NOT_BLOCKED. This is how I convert the blocklist into an allowlist. The _setFrozen function is also virtual so I could add additional logic like logging or secondary checks if needed.
+```solidity
+function _checkRestriction(address account) internal view virtual {
+    require(canTransact(account), "ERC20UserRestricted");
+}
+```
 
-The virtual nature makes these contracts reusable building blocks. I can start with the defaults and then override only what I need to change for my specific use case.
+`canTransact(account)` is overridden by MyFirstTokenERC20RWA to return `getRestriction(account) == Restriction.ALLOWED`. Both Alice and Bob are ALLOWED, so these checks pass. It calls `super._update(Alice, Bob, 250)`.
 
-### Separation of Concerns
+**Step 8: ERC20._update() - The Final Destination**
 
-I appreciate that OpenZeppelin separated freezing and restriction into two different contracts. They are conceptually distinct. Freezing is about temporarily immobilizing specific amounts of tokens on an account that otherwise can transact. Restrictions are about whether an account can transact at all. Combining them would create a more complex design. Separating them lets me choose which features I need.
+Finally we reach the base ERC20's `_update` function. This is where the actual balance changes happen:
 
-MyFirstTokenERC20RWA uses both because RWA tokens typically need both capabilities. But a simpler token might only need one or the other.
+```solidity
+function _update(address from, address to, uint256 amount) internal virtual {
+    if (from != address(0)) {
+        _balances[from] -= amount;
+    }
+    if (to != address(0)) {
+        _balances[to] += amount;
+    }
+    emit Transfer(from, to, amount);
+}
+```
+
+Both `from` and `to` are not address(0), so:
+- Alice's balance decreases by 250: `_balances[Alice] = 500 - 250 = 250`
+- Bob's balance increases by 250: `_balances[Bob] = 200 + 250 = 450`
+- The `Transfer` event is emitted with parameters (Alice, Bob, 250)
+
+**Step 9: Transaction Completes**
+
+After `_update` returns, the ERC20.transfer function returns `true`. The transaction execution completes successfully. The transaction is mined into a block, Alice's wallet shows the updated balance, and the dashboard's event monitor picks up the Transfer event.
+
+### What Happens When a Check Fails?
+
+The security chain is only as strong as its weakest link. If any check fails, the entire transaction reverts. No balance changes occur. No events are emitted. The user's wallet shows an error.
+
+Let me trace what happens with different failure modes.
+
+**Scenario A: Token is Paused**
+
+Alice tries to transfer 50 tokens while the token is paused.
+
+- ERC20Pausable._update() runs first and calls `require(!_isPaused())`. Since `_isPaused()` returns true, the require fails and reverts.
+- The revert propagates back through all the `super._update` calls immediately.
+- No further checks run (freeze check, restriction check, balance update).
+- The transaction fails with error message "ERC20Pausable: transfer paused".
+- Alice's balance remains unchanged.
+
+This demonstrates the importance of the pause check being early in the chain. Pause is a global emergency condition that should block everything.
+
+**Scenario B: Sender's Available Balance Too Low**
+
+Alice has 500 total tokens, 400 frozen (only 100 available). She tries to send 250.
+
+- ERC20Pausable passes (not paused).
+- ERC20Freezable._update runs. `available(Alice)` returns `500 - 400 = 100`. It checks `100 >= 250`, which is false. The require fails with error "ERC20InsufficientUnfrozenBalance".
+- Transaction reverts immediately.
+- Balance unchanged.
+
+**Scenario C: Sender is NOT ALLOWED**
+
+Alice is in BLOCKED state (or DEFAULT in allowlist mode). She tries to transfer.
+
+- ERC20Pausable passes.
+- ERC20Freezable checks available balance and passes (she has enough available).
+- ERC20Restricted._update calls `_checkRestriction(Alice)`. `canTransact(Alice)` returns false because she's not ALLOWED. The require fails with "ERC20UserRestricted".
+- Transaction reverts.
+- Balance unchanged.
+
+**Scenario D: Recipient is NOT ALLOWED**
+
+Alice and Bob are both ALLOWED, but Charlie is BLOCKED. Alice tries to send to Charlie.
+
+- All checks on Alice pass.
+- ERC20Restricted checks Bob? No, it checks Charlie as the recipient. `canTransact(Charlie)` returns false. It reverts with "ERC20UserRestricted".
+- Transaction fails before any balances change.
+
+**Scenario E: Insufficient Total Balance**
+
+Alice has 80 total tokens (not 500). She tries to send 100.
+
+- ERC20Pausable passes.
+- ERC20Freezable calculates available = 80 - frozen (whatever that is). But wait, the available check might pass if her frozen amount is high enough that available is less than 80. Actually, let's be precise: she has total 80, say 20 frozen, so available = 60. The freeze check compares available to amount, so `60 >= 100` fails. That's one failure mode.
+
+But what if her available balance is actually >= 100? That would require her total balance to be >= 100 + frozenAmount. For example, if she has total 500, frozen 400, available 100, and tries to send 100, the freeze check passes because available(100) >= 100. But the total balance check hasn't happened yet!
+
+Does ERC20 check total balance? Yes, in the ERC20.transfer function before `_update` is called:
+
+```solidity
+require(balanceOf(owner) >= amount, "ERC20: insufficient balance");
+```
+
+So that check happens even before `_update` is entered. In our trace, we said Step 3 includes that check. That's important: the base ERC20 ensures total balance suffices before any of our security extensions even run.
+
+The order of checks across the whole system:
+1. In `transfer` (ERC20): `balanceOf(sender) >= amount` (total balance check)
+2. In `transfer` (ERC20): `_beforeTokenTransfer` hook (if any)
+3. In `MyFirstTokenERC20RWA._update`: calls super
+4. In `ERC20Pausable._update`: `!isPaused()`
+5. In `ERC20Freezable._update`: `available(sender) >= amount`
+6. In `ERC20Restricted._update`: `canTransact(sender)` and `canTransact(recipient)`
+7. In `ERC20._update`: actual balance subtraction and addition
+
+So total balance is checked before authorized actions, paused status is first in the security chain, then available (unfrozen) balance, then restrictions, then finally the balances are modified.
+
+### Why This Order Matters
+
+The order of the override chain determines which error message a user sees when multiple conditions are violated. If Alice is both restricted and has her token paused, she'll see the "paused" error because that check runs first.
+
+This ordering is intentional. Pause is the most urgent condition. If the token is paused, everything should stop immediately, no further checks needed. The restriction check could also fail, but we don't need to know that if the system is already paused for an emergency.
+
+After pause, we check available balance. This ensures that frozen tokens are accounted for before we look at restrictions. If the user has insufficient available balance, they probably shouldn't see a restriction error because the issue is their funds being frozen, not their permission status.
+
+Finally, restrictions are checked. This verifies that both sender and recipient are allowed.
+
+The actual balance update happens only after all checks pass.
+
+### What About Minting and Burning?
+
+The `_update` function receives `address(0)` for the `from` or `to` parameters when minting or burning:
+
+- Minting: `from = address(0)`, `to = recipient`, `value = amount`
+- Burning: `from = sender`, `to = address(0)`, `value = amount`
+
+The override implementations check `if (from != address(0))` and `if (to != address(0))` to skip certain checks for minting and burning. Why?
+
+- Pausable: It checks `require(!_isPaused())` unconditionally, meaning even minting and burning are paused when the token is paused. That makes sense: during an emergency, all token movements should stop, including minting and burning.
+
+- Freezable: It checks `if (from != address(0))` before checking available balance. When minting, `from` is address(0), so the freeze check is skipped. That's correct: minting creates new tokens from nothing, the recipient's frozen balance isn't relevant because these tokens are newly created and not frozen initially. When burning, `from` is the burning account, so the freeze check runs. That's interesting: if an account has frozen tokens, can it burn them? Let's check: burning requires available balance? Actually the burn function commonly calls `_update` with `to = address(0)`. The freeze check looks at `from` (the burner). If the burner has frozen tokens, the available balance is total - frozen. If they try to burn more than available, the freeze check will block it. This is intentional: if tokens are frozen, the account cannot move them, and burning counts as moving them to address(0). So frozen tokens cannot be burned until they're unfrozen. This is a design decision that prevents people from burning frozen tokens to circumvent freezing. Good.
+
+- Restricted: It checks `if (from != address(0))` (sender restriction) and `if (to != address(0))` (recipient restriction). For minting, `from = 0`, so sender restriction is skipped (no sender to check), but recipient restriction is checked (the recipient must be allowed to receive). So even during minting, the recipient must be allowed. That's important for RWA tokens: only allowed investors can receive newly minted tokens. For burning, `to = 0`, so recipient restriction is skipped, but sender restriction is checked (the burner must be allowed to send). This means only allowed accounts can burn tokens. That also makes sense: unauthorized holders shouldn't be able to destroy tokens.
+
+So the minting and burning flows are carefully controlled by the same security checks, appropriately adapted.
+
+### The Return of supportsInterface
+
+The `supportsInterface` function is used by the `ERC165` standard to detect what interfaces a contract implements. Multiple parent contracts implement this function, so MyFirstTokenERC20RWA must override to combine their answers.
+
+```solidity
+function supportsInterface(bytes4 interfaceId)
+    public
+    view
+    override(AccessControl, ERC1363)
+    returns (bool)
+{
+    return super.supportsInterface(interfaceId);
+}
+```
+
+When queried with a specific interfaceId (like `0x01ffc9a7` for ERC20), this function calls `super.supportsInterface(interfaceId)`. The inheritance chain will check each parent contract's `supportsInterface` implementation, ultimately returning true if any parent supports that interface.
+
+This enables wallets and other contracts to programmatically discover capabilities. If a wallet calls `supportsInterface(ERC20_INTERFACE_ID)`, it gets true and knows it can use standard ERC20 functions. If it calls with `IERC165_INTERFACE_ID`, it also gets true because ERC165 is supported by many contracts.
+
+### Counting Override Specifications
+
+I notice that in `_update`, the override list is `(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted)`. Why not include AccessControl? Because AccessControl does not define an `_update` function. Only contracts that have a virtual function with that exact signature need to be listed.
+
+Similarly, why not include ERC20Burnable or ERC20Permit or ERC1363? Because they don't have `_update` functions. They may have other functions like `burn` or `permit` but they don't interfere with `_update`.
+
+The override list must be complete and accurate. Overlooking a parent that defines `_update` will cause a compilation error. Listing a parent that doesn't define `_update` also causes an error.
+
+### Different Override Patterns in This Contract
+
+The contract shows two different ways to write overrides:
+
+1. With explicit parent list:
+```solidity
+override(ERC20, ERC20Pausable, ERC20Freezable, ERC20Restricted)
+```
+Used when multiple parents in the hierarchy define the overridden function.
+
+2. Without parent list (simple override):
+```solidity
+override
+```
+Used when exactly one parent defines the function. The compiler can infer which one.
+
+Both are correct and compile to the same bytecode. The explicit list just provides clarity.
+
+### Runtime Override Resolution
+
+At runtime, when `super._update` is called, the EVM doesn't actually traverse a list of function pointers in the order written in the source. Instead, Solidity's inheritance resolution uses a linearization computed at compile time. The call goes to the next implementation in that linearization order.
+
+The linearization for MyFirstTokenERC20RWA is determined by the `is` clause order and the inheritance hierarchy of each parent. The manual says it uses a depth-first, left-to-right traversal with duplicates removed and maintaining order. For our contract, the computed order for ancestors that have `_update` is:
+
+MyFirstTokenERC20RWA => ERC20Pausable => ERC20Freezable => ERC20Restricted => ERC20
+
+This is exactly the order we specified in the override list. The override list must match this linearization for the contracts that define the function.
+
+### Testing the Override Chain
+
+I can test the override chain by trying to trigger each error condition:
+
+- **Pause test**: Have the pauser call `pause()`. Then try to transfer as a normal user. Expect "ERC20Pausable: transfer paused" error.
+- **Freeze test**: Have the freezer call `freeze(Alice, 400)` on Alice who has 500 tokens. Alice tries to transfer 200. Expect "ERC20InsufficientUnfrozenBalance" because her available is only 100.
+- **Restriction test**: Have the limiter call `disallowUser(Bob)` to set Bob to BLOCKED. Alice (allowed) tries to send to Bob. Expect "ERC20UserRestricted".
+- **Normal transfer**: With no special conditions, transfer should succeed and emit Transfer event.
+- **Mint test**: Have minter call `mint(Charlie, 1000)`. If Charlie is not allowed, expect "ERC20UserRestricted" because recipient restriction is checked.
+- **Burn test**: A user burns their tokens. If they have frozen tokens, the freeze check applies (can't burn more than available). If they are restricted, burn should fail because sender restriction is checked.
+
+Each test confirms that the correct check is in place and in the expected order.
+
+### Override Chain Implications for Future Extensions
+
+If I want to add another security extension in the future, I need to consider where it fits in the override chain. For example, suppose I want to add a daily transfer limit per account. I'd create an extension that overrides `_update` and checks the cumulative transfers for the day. I would need to decide:
+
+- Should it run before or after the pause check? Probably after, because if paused we don't care about limits.
+- Should it run before or after the freeze check? Possibly after, because if funds are frozen they can't transfer anyway.
+- Should it run before or after restriction check? Probably after, because restricted accounts shouldn't even try to transfer.
+
+Thus my new extension would go after ERC20Freezable in the chain or maybe after ERC20Restricted. I would need to:
+
+1. Create a new contract that inherits from something like ERC20 and overrides `_update`.
+2. Modify MyFirstTokenERC20RWA to inherit from this new contract and include it in the override list at the appropriate position.
+3. Recompile and redeploy.
+
+### Storage Layout Considerations: Ensuring Data Safety Across Inheritance
+
+One subtle but critical aspect of combining multiple contracts is storage layout. Each parent contract defines its own state variables. When combined through inheritance, there's a risk that two variables could end up in the same storage slot, causing data corruption. For example, the `_frozenBalances` mapping from ERC20Freezable could theoretically overwrite the `_balances` mapping from ERC20 if the compiler assigned them the same slot. That would be catastrophic.
+
+The good news is that Solidity's compiler has strict rules that prevent such collisions in normal inheritance patterns. Let me explain how storage layout works and why it's safe to combine these extensions.
+
+#### State Variables and Storage Slots
+
+Every contract on Ethereum has its own storage, which is essentially a massive dictionary mapping 256-bit integers (slot indices) to 256-bit values (slot contents). When I define a state variable, the compiler assigns it to one or more slots.
+
+Simple value types like `uint256`, `address`, and `bool` occupy exactly one slot (32 bytes). Even though a `bool` only needs 1 bit, it reserves an entire 32-byte slot because storage is addressed at the slot level. Mappings are trickier: they occupy a single base slot but then use a hash function to scatter their key-value pairs across storage arbitrarily. This means two different mappings will not have overlapping entries even if their base slots are different.
+
+The key insight: When contracts inherit, each contract's state variables are placed in a separate region of storage. The compiler computes the layout by starting with the first base contract's variables in consecutive slots, then continuing with the next base contract's variables, and so on. The child contract's own variables go after all parents. This ensures separation.
+
+Let me illustrate with a simplified example. Suppose I have:
+
+```solidity
+contract A {
+    uint256 private a;        // slot 0
+    mapping(address => uint256) private mapA; // base slot 1
+}
+
+contract B {
+    uint256 private b;        // slot 0 in B's own layout
+    mapping(address => uint256) private mapB; // base slot 1
+}
+
+contract C is A, B {
+    uint256 private c;        // slot after A and B's variables
+}
+```
+
+When C is deployed:
+- A's `a` goes to slot 0
+- A's `mapA` base goes to slot 1
+- B's `b` goes to slot 2 (because A used slots 0-1)
+- B's `mapB` base goes to slot 3
+- C's `c` goes to slot 4
+
+So `C.a` is at slot 0, `C.b` is at slot 2. They never clash.
+
+This guarantee holds as long as the contracts are not themselves inheriting from a common ancestor (diamond problem) and no contract explicitly sets storage slot positions using `storage` or assembly. OpenZeppelin contracts are designed to avoid such complexities.
+
+#### Storage Layout in Our Token Contract
+
+Let's enumerate the state variables in each relevant parent contract:
+
+**ERC20**:
+- `_totalSupply` (`uint256`) - 1 slot
+- `_balances` (`mapping(address => uint256)`) - 1 base slot
+- `_allowances` (`mapping(address => mapping(address => uint256))`) - 1 base slot
+
+**ERC20Pausable**:
+- `_paused` (`bool`) - 1 slot
+
+**ERC20Freezable**:
+- `_frozenBalances` (`mapping(address => uint256)`) - 1 base slot
+
+**ERC20Restricted**:
+- `_restrictions` (`mapping(address => Restriction)`) - 1 base slot
+
+**AccessControl**:
+- `_roles` (`mapping(bytes32 => mapping(address => bool))`) - 1 base slot
+
+All these mappings use 1 base slot each. The boolean `_paused` uses 1 slot. The `_totalSupply` uses 1 slot.
+
+Under a typical compiler layout, the slots might be assigned as:
+
+| Slot | Contract | Variable |
+|------|----------|----------|
+| 0 | ERC20 | _totalSupply |
+| 1 | ERC20 | _balances |
+| 2 | ERC20 | _allowances |
+| 3 | ERC20Pausable | _paused |
+| 4 | ERC20Freezable | _frozenBalances |
+| 5 | ERC20Restricted | _restrictions |
+| 6 | AccessControl | _roles |
+
+The exact slot numbers are not important; what matters is they're all distinct. The compiler ensures this.
+
+#### Verifying with Compiler Output
+
+I can confirm the storage layout by compiling the contract with solc's `--storage-layout` option or by using Hardhat's `extractStorage` diagnostic. The output will show the slot for each state variable. This is useful for debugging or if I need to write assembly code that accesses specific slots.
+
+For example, I might want to check that `_frozenBalances` indeed uses a different slot than `_balances`. I can use:
+
+```bash
+solc --storage-layout MyFirstTokenERC20RWA.sol
+```
+
+The output will list each contract's storage variables and their slot indices relative to the start of that contract's region. The important thing to note is that each contract's region starts at a different offset, guaranteeing no overlap.
+
+#### Contracts with Shared Base Contracts
+
+What if two parent contracts both inherit from the same base contract? For example, both ERC20Burnable and ERC20Pausable inherit from ERC20. Would that cause the ERC20 variables to be duplicated? No, because ERC20 appears only once in the inheritance hierarchy. The linearization ensures that ERC20's variables are included exactly once. The child contract's view of the storage is that it has one set of ERC20 variables, not duplicates.
+
+This is why the inheritance declaration uses a linear chain without repeating base contracts, even if multiple parents share a common ancestor. The compiler eliminates duplicates automatically.
+
+#### Implications for Upgradeability
+
+If I ever want to make this token upgradeable (using a proxy pattern where the storage is anchored in a proxy contract and the logic can be swapped), I must preserve storage layout across upgrades. When I deploy a new version of the token contract to replace the old one, the new version must assign exactly the same slot numbers to all existing state variables. I can only add new variables at the end, after all existing variables from all contracts, and without reordering anything.
+
+OpenZeppelin's upgradeable contracts follow a convention: they put all state variables in a single base contract (like `Initializable` or a custom storage contract) to make layout management easier. Our token contract as written is not upgradeable; it's a simple deployment that cannot be changed. If I wanted upgradeability, I would need to redesign using the OpenZeppelin Contracts upgradeable packages.
+
+But for a simple deployment, the compiler's automatic layout is safe and reliable.
+
+#### Constants and Immutables Are Not in Storage
+
+It's important to distinguish between state variables that occupy storage and those that don't:
+
+- `constant` variables: Their value is embedded in the contract's bytecode. They do not occupy storage at all. Reading them costs no gas beyond reading code. Examples: role identifiers defined as `bytes32 public constant ROLE = keccak256("ROLE")`.
+
+- `immutable` variables: Their value is set once in the constructor and then stored in the contract's code section (not storage). They can be read like regular variables but are cheaper to read because they come from code, not a storage slot.
+
+Our token contract uses constants for the role identifiers. These do not contribute to storage usage. The only storage used are the mutable state variables in the inherited contracts.
+
+#### Why Storage Collisions Are Unlikely Here
+
+Given our contract's inheritance tree:
+```
+MyFirstTokenERC20RWA
+├─ ERC20 (with _balances, _allowances, _totalSupply)
+├─ ERC20Permit (no extra storage? actually it inherits from ERC20 and adds nonces and domains? Possibly state variables)
+├─ ERC20Burnable (inherits from ERC20, no extra storage)
+├─ ERC20Pausable (adds _paused)
+├─ ERC20Freezable (adds _frozenBalances)
+├─ ERC20Restricted (adds _restrictions)
+└─ AccessControl (adds _roles)
+```
+
+Wait, ERC20Permit does add state variables: `mapping(address => uint256) private _nonces` and `bytes32 private _domainSeparator`. These would occupy additional slots. So the actual slot list is longer. But still, each parent's added variables occupy distinct slots due to the linearization.
+
+The key point: we do not need to manually track slots. The compiler handles it. As long as we use standard OpenZeppelin contracts and don't do unusual storage manipulations, we can trust the compiler to avoid collisions.
+
+#### Storage Dynamics of a Transfer
+
+When a transfer occurs, which storage slots are accessed?
+
+- Read: `_balances[from]` and `_balances[to]` (both are in ERC20's `_balances` mapping)
+- Write: Same two slots are updated.
+
+Additionally, other reads occur for checks:
+- `_isPaused()` reads `_paused` (ERC20Pausable)
+- `available(from)` reads `_frozenBalances[from]` and `_balances[from]`
+- `getRestriction(sender)` and `getRestriction(recipient)` read `_restrictions` mapping entries
+- Possibly `_allowances` if using transferFrom
+
+But importantly, none of these checks write to storage except the final balance updates and the internal events (which are logs, not storage). So the storage writes are only two slots per transfer (sender and recipient balances). That's efficient.
+
+#### Reading Storage from Outside
+
+Users can read balances and allowances via automatically generated getter functions. These functions use `SLOAD` to retrieve data from storage. Wallets and explorers do this constantly. The gas costs for such reads are paid by the caller (the node providing the data) not by the contract, so reading is free from the user's perspective.
+
+#### Advanced: Storage Pointer Attack
+
+One theoretical attack vector: If a contract has a function that returns a pointer to storage (like a struct containing a mapping), a malicious caller might try to manipulate that to write to unexpected slots. But OpenZeppelin functions are carefully designed to not expose raw storage pointers. All mappings are private and only accessed through controlled functions.
+
+#### Conclusion
+
+Storage layout is handled automatically and safely by the Solidity compiler. The systematic allocation of slots across the inheritance chain ensures that each state variable occupies its own space. For our token, this means `_balances`, `_frozenBalances`, `_restrictions`, and all other mappings coexist without interference. We can combine these extensions with confidence that the underlying data integrity is preserved.
+
+Understanding storage layout helps me appreciate why certain patterns (like using a single storage contract for upgradeability) are necessary and why automatic layout is reliable for simple deployments. The system is designed to let developers compose contracts without worrying about low-level storage address collisions.
+
+The `_update` override chain is the security core of this token. Each parent contract injects its own check into the pipeline. The order is carefully chosen so that global conditions (pause) are checked first, then resource constraints (available balance), then access control (restrictions), and finally the actual balance update.
+
+Understanding this chain helps me reason about exactly what happens during any token operation. It also demonstrates the power of inheritance-based composition in Solidity: I can combine independently-developed extensions to build a sophisticated, multi-layered security system.
 
 ## Real World Usage Patterns
 
