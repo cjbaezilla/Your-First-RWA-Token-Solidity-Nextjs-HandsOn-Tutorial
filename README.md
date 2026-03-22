@@ -1,5 +1,7 @@
 # # The Beginner's Hands-On Guide to RWA Tokens on Ethereum: Solidity, Hardhat, OpenZeppelin, and Next.js Dashboard
 
+![Cover](./images/1.jpg)
+
 ![Cover](./images/screenshot_overview_page.png)
 
 A hands-on tutorial for creating and deploying a Real World Asset (RWA) token on Ethereum Sepolia network using Solidity, Hardhat, OpenZeppelin, and Next.js.

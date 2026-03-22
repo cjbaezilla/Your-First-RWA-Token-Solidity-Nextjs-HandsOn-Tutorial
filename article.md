@@ -1,5 +1,7 @@
 # The Beginner's Hands-On Guide to RWA Tokens on Ethereum: Solidity, Hardhat, OpenZeppelin, and Next.js Dashboard
 
+![Cover](./images/1.jpg)
+
 ![Cover](./images/screenshot_overview_page.png)
 
 - Code Repository: https://github.com/cjbaezilla/Your-First-RWA-Token-Solidity-Nextjs-HandsOn-Tutorial
