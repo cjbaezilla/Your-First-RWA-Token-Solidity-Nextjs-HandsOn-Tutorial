@@ -479,7 +479,9 @@ The ability to query restrictions via getRestriction means off-chain systems can
 
 ## The Role System
 
-Right after the imports I see six role definitions. These are the keys to the kingdom. They determine who can perform special administrative functions. Notice that each role is created using keccak256 hashing. This produces a unique bytes32 identifier that represents each role.
+I want to explain the six distinct roles in this token system because understanding them helps you see how access and control are carefully managed. Each role represents a specific authority that someone or some organization holds. Think of these like different keys to different rooms in a building. Not everyone gets all the keys.
+
+The roles are defined in the contract using keccak256 hashes. This creates unique identifiers that the blockchain can verify. The contract owner grants these roles to specific addresses during deployment. Later the DEFAULT_ADMIN_ROLE holder can grant or revoke them as needed.
 
 ```solidity
 bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -489,20 +491,24 @@ bytes32 public constant LIMITER_ROLE = keccak256("LIMITER_ROLE");
 bytes32 public constant RECOVERY_ROLE = keccak256("RECOVERY_ROLE");
 ```
 
+### What Each Role Can Do
+
 The AccessControl library manages these roles. The contract itself exposes the role constants as public variables so anyone can check which addresses hold which roles. This creates transparency about who has administrative powers.
 
-The roles serve these purposes:
+I will walk you through each role and its responsibilities.
 
-| Role | Can Do This | Why It Matters |
-|------|-------------|----------------|
-| MINTER_ROLE | Create new tokens | Only authorized people can increase token supply for real asset purchases |
-| PAUSER_ROLE | Stop all transfers | Emergency brake to protect users during attacks or bugs |
-| FREEZER_ROLE | Freeze specific accounts | Prevent malicious actors from moving stolen tokens |
-| LIMITER_ROLE | Control who can receive tokens | Ensure compliance with regulations about who can hold the token |
-| RECOVERY_ROLE | Move tokens between accounts | Rescue tokens sent to wrong addresses or recover from compromised accounts |
-| DEFAULT_ADMIN_ROLE | Grant and revoke other roles | Central oversight of the entire permission system |
+| Role | What This Person Can Do | Why We Need This |
+|------|------------------------|------------------|
+| MINTER_ROLE | Create new tokens when the organization purchases real assets | New tokens only appear when there is actual backing. This prevents unlimited token creation and maintains value integrity |
+| PAUSER_ROLE | Stop all token transfers across the entire system | An emergency switch for critical situations like security breaches or discovered bugs. This protects users until the issue is resolved |
+| FREEZER_ROLE | Freeze tokens in specific accounts without consent | When suspicious activity occurs, this role can lock tokens in place while investigations happen. The tokens remain in the account but cannot move |
+| LIMITER_ROLE | Control who can receive tokens by maintaining an allowlist | Regulatory compliance. Some jurisdictions restrict which investors can hold certain tokens. This role ensures only verified participants can acquire tokens |
+| RECOVERY_ROLE | Move tokens between accounts regardless of normal restrictions | Rescue tokens sent to wrong addresses or recover assets from compromised accounts. This is a safety net for human error |
+| DEFAULT_ADMIN_ROLE | Grant and revoke all other roles. This is the oversight role | Central management of the entire permission system. This role holder can update the team as people change roles |
 
-The DEFAULT_ADMIN_ROLE comes from the AccessControl library itself. This is the super admin role that can manage all other roles.
+These roles create a system of checks and balances. No single person can unilaterally control everything. The minter cannot pause the system. The freezer cannot mint new tokens. The pauser cannot change who holds roles. This design prevents any one point of failure or abuse.
+
+In a real deployment, these roles would likely be held by different entities. A compliance company might hold the LIMITER_ROLE. A security team might hold the FREEZER_ROLE. The pauser might be a multisig wallet controlled by several board members. This distributed control mirrors how traditional financial systems operate with multiple signatories and approval workflows.
 
 ## The Constructor Setting Up Permissions
 
