@@ -21,6 +21,15 @@ This project teaches you how to build, deploy, and interact with a production-re
 - ✅ **Full Frontend** with Next.js for on-chain interaction
 - ✅ **MetaMask Integration** for wallet connectivity
 
+## Read More
+
+1. 📢 **LinkedIn announcement**: https://www.linkedin.com/posts/carlos-baeza-negroni_rwa-tokenization-solidity-activity-7441482335184773120-seSB
+2. 📖 **Read the article directly on LinkedIn**: https://www.linkedin.com/pulse/beginners-hands-on-guide-rwa-tokens-ethereum-solidity-baeza-negroni-wgvlf
+3. 🐦 **X/Twitter Announcement**: https://x.com/cjbaezilla/status/2035719995871654145
+4. 🧩 **Project Repository**: https://github.com/cjbaezilla/Your-First-RWA-Token-Solidity-Nextjs-HandsOn-Tutorial
+5. 🔍 **Browse the source**:
+   [article.md](./article.md)
+
 ## Main Repositories
 
 - **[hardhat2](hardhat2)** - Production-ready RWA token implementation with Hardhat, OpenZeppelin contracts, and comprehensive compliance features (freezing, pausable, role-based access control)
