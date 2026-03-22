@@ -4,6 +4,8 @@
 
 A hands-on tutorial for creating and deploying a Real World Asset (RWA) token on Ethereum Sepolia network using Solidity, Hardhat, OpenZeppelin, and Next.js.
 
+![mermaid](../images/mermaid.png)
+
 ## Overview
 
 This project teaches you how to build, deploy, and interact with a production-ready RWA token that includes essential features for real-world asset tokenization:
@@ -16,6 +18,11 @@ This project teaches you how to build, deploy, and interact with a production-re
 - ✅ **Pausable** functionality for emergency stops
 - ✅ **Full Frontend** with Next.js for on-chain interaction
 - ✅ **MetaMask Integration** for wallet connectivity
+
+## Main Repositories
+
+- **[hardhat2](hardhat2)** - Production-ready RWA token implementation with Hardhat, OpenZeppelin contracts, and comprehensive compliance features (freezing, pausable, role-based access control)
+- **[nextjs](nextjs)** - Premium real-time dashboard built with Next.js, RainbowKit, and wagmi for managing and monitoring the RWA token with live event feeds
 
 ## Prerequisites
 
@@ -57,7 +64,6 @@ Real World Asset (RWA) tokens represent physical assets on the blockchain. Examp
 
 ### Resources
 
-- [hardhat2 Folder](hardhat2) - Updated Hardhat project structure
 - [OpenZeppelin Contracts](https://openzeppelin.com/contracts/)
 - [Hardhat Documentation](https://hardhat.org/docs)
 - [Next.js Documentation](https://nextjs.org/docs)

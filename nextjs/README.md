@@ -1,8 +1,12 @@
 # RWA Token Management Dashboard
 
+![Cover](../images/screenshot_overview_page.png)
+
 This is a premium, real-time dashboard for interacting with the `MyFirstTokenERC20RWA` smart contract. It provides a comprehensive interface for administrators and users to manage and monitor the token's lifecycle.
 
-## ✨ Features
+![mermaid](../images/mermaid.png)
+
+## Features
 
 - **Real-time Event Feed**: Live monitoring of contract events using `useWatchContractEvent`.
 - **Role-Based Interaction**: Dynamic UI that adapts based on the user's roles (Admin, Minter, Freezer, etc.).
@@ -10,7 +14,41 @@ This is a premium, real-time dashboard for interacting with the `MyFirstTokenERC
 - **Premium Design**: Modern glassmorphism aesthetic with responsive layouts and vibrant gradients.
 - **Live Data**: Automatic polling (every 5 seconds) for token supply and user balances.
 
-## 🚀 Getting Started
+## Operations
+
+### Recovery Transfer
+Allows administrators to transfer tokens from a frozen or compromised address to a new safe address, ensuring asset recovery while maintaining compliance.
+
+![Recovery Transfer Interface](../images/recovery_transfer_management.png)
+*Figure 1: Recovery transfer management interface*
+
+### Freeze Balance
+Enables admins to immediately freeze token balances for specific addresses, preventing unauthorized transfers and maintaining regulatory compliance.
+
+![Freeze Balance Interface](../images/freeze_balance_management.png)
+*Figure 2: Freeze token balance management interface*
+
+### Allowlist Management
+Provides tools to manage whitelist functionality, controlling which addresses are authorized to hold or transfer RWA tokens.
+
+![Allowlist Management Interface](../images/allowlist_management.png)
+*Figure 3: Allowlist and access control management*
+
+# Screenshots
+
+### Supply Management
+Interface for minting and burning tokens with real-time supply monitoring.
+
+![Supply Management Interface](../images/screenshot_supply_page.png)
+*Figure 4: Token supply management interface*
+
+### Activity Feed
+Live event log displaying all contract interactions and token transfers.
+
+![Activity Feed Interface](../images/screenshot_activity_page.png)
+*Figure 5: Contract activity event log*
+
+## Getting Started
 
 First, install the dependencies:
 

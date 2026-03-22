@@ -2,6 +2,9 @@
 
 ![Cover](./images/screenshot_overview_page.png)
 
+- Code Repository: https://github.com/cjbaezilla/Your-First-RWA-Token-Solidity-Nextjs-HandsOn-Tutorial
+- RWA Token Deployed: https://sepolia.etherscan.io/address/0x4E717ea5F91Afd031D6CFbb1165Eee346D11E30D
+
 # Introduction
 
 Welcome to a hands-on guide that will help you build your first Real World Asset token from the ground up. I will walk you through every concept and piece of code, assuming you have no prior experience with blockchain technology or cryptocurrency. My goal is to transform complex ideas into clear understanding, so you can confidently create tokens that comply with real-world regulatory requirements.
