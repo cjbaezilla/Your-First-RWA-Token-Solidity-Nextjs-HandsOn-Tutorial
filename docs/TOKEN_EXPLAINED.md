@@ -30,6 +30,69 @@ To follow along with this project and interact with the dashboard, you will need
 2.  **Testnet Currency (Sepolia ETH)**: This project runs on the **Sepolia Test Network**. This is a "practice" blockchain where "money" is free. You can get some from a "faucet" (a website that gives away small amounts of test ETH).
 3.  **Basic Understanding of "Gas"**: Every action on the blockchain (like sending tokens) costs a tiny amount of "Gas." On Sepolia, this is paid using your test ETH.
 
+## Deployment and Configuration
+
+### Funding Your Deployment Account
+
+To deploy the contract, I need Sepolia ETH for gas fees. Gas is the fee paid to network validators for processing transactions. On the Sepolia test network, this ETH is free and has no real-world value. I can acquire it from public faucets that distribute test ETH to anyone who requests it.
+
+A faucet is simply a website where I enter my wallet address and receive a small amount of ETH. Here are some reliable sources I can use:
+
+| Faucet | How it works | Amount given | Things to know |
+|--------|--------------|--------------|----------------|
+| Alchemy Sepolia Faucet | Visit the site, paste wallet address, click request | 0.5 ETH per day | Requires a free Alchemy account |
+| Infura Sepolia Faucet | Sign in with GitHub, enter address, claim | 0.1 ETH per day | One claim per GitHub account daily |
+| Chainlink Faucet | Complete a captcha, submit address | 0.1 ETH | No account needed, limited hourly |
+| Sepolia PoW Faucet | Solve a small computational puzzle | Varies based on difficulty | Requires some CPU time |
+
+I should add my wallet address to MetaMask's Sepolia network before requesting funds. Once I submit the request, the ETH arrives in my wallet within seconds to a few minutes. I recommend getting at least 0.5 ETH total to cover deployment costs and multiple test transactions. Having a buffer ensures I don't run out of gas during testing.
+
+### Environment Variables
+
+The Next.js frontend requires configuration to connect to my deployed contract and wallet services. I store these values in a `.env.local` file at the root of the project. This file stays out of version control to protect any sensitive keys.
+
+The key environment variables are:
+
+| Variable | What it does | Where to obtain it | Example format |
+|----------|--------------|--------------------|----------------|
+| `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` | Authenticates my app with WalletConnect, enabling wallet connections | Create a project at cloud.walletconnect.com | `a1b2c3d4e5f6...` |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Tells the frontend which contract to interact with on the blockchain | Copy from deployment output after running the script | `0x1234567890abcdef...` |
+| `NEXT_PUBLIC_SEPOLIA_RPC_URL` (optional) | Provides a direct endpoint to Sepolia nodes, improving reliability | From Alchemy or Infura project dashboard | `https://eth-sepolia.g.alchemy.com/v2/your-key` |
+
+The `NEXT_PUBLIC_` prefix is required for Next.js to expose these variables to the browser. Without it, the variables remain server-only and the frontend cannot access them.
+
+The `WALLET_CONNECT_PROJECT_ID` is free to obtain and only identifies my application; it does not expose private keys. I sign up at WalletConnect Cloud, create a new project named something like "My RWA Token", and copy the Project ID.
+
+The `CONTRACT_ADDRESS` changes every time I redeploy. After running `npx hardhat run scripts/deploy.js --network sepolia`, the console prints a line like "deployed to: 0x...". I copy that exact address into my `.env.local` file.
+
+If I skip setting these variables, the dashboard will not be able to connect to wallets or find my token contract, and I'll see connection errors in the browser console.
+
+### Deploying and Configuring Your Contract
+
+Deployment brings my token contract onto the Sepolia testnet where anyone can interact with it. The project includes a ready-to-use deployment script that handles compilation and deployment in one step.
+
+I open a terminal in the project root and run:
+
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+This command compiles the Solidity contracts, connects to Sepolia via my configured RPC, and deploys them using the account that is set as the default deployment account in Hardhat. The script prints the contract address and the role assignments to the console.
+
+As soon as I see the deployed address, I copy it into my `.env.local` file under `NEXT_PUBLIC_CONTRACT_ADDRESS`. If I make changes to the contract and redeploy, I repeat this step to update the address.
+
+The deployment also outputs which accounts hold the five administrative roles (default admin, pauser, minter, freezer, limiter, recovery). I can use these addresses to log into the dashboard and test the admin features. By default, the first account from Hardhat's sample accounts receives all roles, but I can modify the script to assign different addresses.
+
+Once the environment variables are set and the contract is deployed, I start the Next.js development server:
+
+```bash
+npm run dev
+```
+
+Visiting `http://localhost:3000/dashboard` shows the interface. I connect my wallet, and if my address matches one of the role holders, the admin buttons appear. I can now mint tokens, transfer them, freeze balances, and monitor the activity feed.
+
+Should I ever need to redeploy, I just run the deployment command again, update the contract address in `.env.local`, and restart the dev server. The changes are reflected immediately. This simple workflow lets me iterate quickly while learning how the contract behaves on a live network.
+
 ## Key Terms to Know
 
 | Term | Simple Explanation |
